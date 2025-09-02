@@ -1,0 +1,24 @@
+global:
+  database_path: ../DataWareHouse/database.db
+  datawarehouse_path: ../DataWareHouse/
+  templates_path: ./templates/
+
+orchestrator:
+  max_parallel_instances: 4
+  timeout_seconds: 900
+
+performance_analyzer:
+  metrics:
+    - accuracy
+    - over_detection_count_per_hour
+  visualization_level: standard
+
+instance_analyzer:
+  max_hypothesis_attempts: 3
+  llm_model: gpt-4
+  temperature: 0.1
+  drowsy_detection:
+    left_eye_close_threshold: 0.10
+    right_eye_close_threshold: 0.10
+    continuous_close_time: 1.00
+    face_conf_threshold: 0.75

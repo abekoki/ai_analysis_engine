@@ -1,230 +1,214 @@
-# AIアルゴリズム異常解析システム
+# AI分析エンジン
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![LangChain](https://img.shields.io/badge/LangChain-0.1+-green.svg)](https://langchain.com/)
+AI分析エンジンは、アルゴリズムの評価結果を自動分析し、詳細な分析レポートを生成するシステムです。
 
-## 📋 概要
+## 概要
 
-AIアルゴリズム異常解析システムは、アルゴリズムが生成した結果（CSV形式）とユーザーが期待する結果（自然言語）を比較し、異常を検出・分析するシステムです。AIエージェントが自律的に解析を行い、Jupyter Notebookに視覚的でわかりやすいレポートを生成します。
+このシステムは以下の3つの主要コンポーネントで構成されています：
 
-## ✨ 主な機能
+1. **Orchestrator** - 全体統制と最終レポート生成
+2. **PerformanceAnalyzer** - 全体性能の確認・差分分析
+3. **InstanceAnalyzer** - 個別データの詳細分析
 
-- **🔍 異常検出**: CSVデータと自然言語の期待値を比較し、異常箇所を特定
-- **🤖 AIエージェント**: LangChainを活用した自律的な解析処理
-- **📊 視覚化**: Jupyter Notebookでのグラフ・表による結果表示
-- **📝 自然言語対応**: 複雑な期待値（合計、パターン、条件付き）を解釈
-- **🔧 原因分析**: 仕様書とソースコードを基に異常の根本原因を特定
-- **📋 レポート生成**: 初心者にも分かりやすい解析レポートの自動生成
+## 主な特徴
 
-## 🎯 対象ユーザー
+- **自動期待値生成**: drowsy_detectionアルゴリズム仕様に基づき、評価結果から期待値を内部生成
+- **DataWareHouse連携**: 評価結果の取得と分析結果の保存を自動化
+- **包括的な分析**: 全体性能分析と個別データ分析の統合
+- **可視化対応**: matplotlib/seaborn/plotlyを使用したグラフ生成
+- **設定管理**: YAMLベースの柔軟な設定システム
 
-- **初心者**: プログラミングやデータ分析の知識が少ない人でも簡単に使用可能
-- **開発者**: アルゴリズムの動作検証やデバッグを行いたい人
-- **研究者**: アルゴリズムの性能評価や異常検出を行いたい人
+## 技術仕様
 
-## 🏗️ システム構成
+- **Python**: 3.10+
+- **主要ライブラリ**:
+  - pandas: データ処理
+  - pandasai: AI支援データ分析
+  - langchain: LLM統合
+  - matplotlib/seaborn/plotly: 可視化
+  - jinja2: テンプレートエンジン
+- **環境管理**: uv
+- **データベース**: DataWareHouse API (SQLite3)
+  - algorithm_api.py: アルゴリズム出力管理
+  - analysis_api.py: 分析結果・問題点管理
+  - evaluation_api.py: 評価データ管理
 
-```mermaid
-graph TD
-    A[ユーザー] -->|CSVと期待値を渡す| B[AIエージェント]
-    B -->|期待値を解釈| C[自然言語処理]
-    B -->|CSVを読み込む| D[Jupyter Notebook]
-    D -->|データを比較| E[異常を検出]
-    E -->|原因を分析| F[仕様書とコードを検索]
-    F -->|結果をまとめる| G[レポート作成<br>（グラフ、表、サマリ）]
-    G -->|完成したNotebookを返す| A[ユーザー]
-```
+## インストール
 
-## 🛠️ 技術スタック
-
-- **AI/ML**: LangChain, OpenAI ChatGPT
-- **データ処理**: Pandas, NumPy
-- **可視化**: Matplotlib, Seaborn
-- **開発環境**: Jupyter Notebook, Python 3.8+
-- **検索**: RAG (Retrieval-Augmented Generation)
-- **自然言語処理**: OpenAI GPTモデル
-
-## 📦 インストール
-
-### 前提条件
-
-- Python 3.8以上
-- Jupyter Notebook
-- OpenAI API キー
-
-### セットアップ
-
-1. リポジトリをクローン
 ```bash
-git clone https://github.com/your-username/ai_analysis_engine.git
-cd ai_analysis_engine
+# 仮想環境作成と依存関係インストール
+uv venv
+source .venv/Scripts/activate  # Windows
+uv pip install -e .
 ```
 
-2. 依存関係をインストール
+## 使用方法
+
+### 基本的な実行
+
 ```bash
-pip install -r requirements.txt
+# デフォルト設定で実行
+python scripts/run_analysis.py
+
+# 特定のアルゴリズム出力IDを指定
+python scripts/run_analysis.py --algorithm-output-id 123
+
+# カスタム設定ファイルを使用
+python scripts/run_analysis.py --config config/production_config.yaml
+
+# 詳細ログ出力
+python scripts/run_analysis.py --verbose
 ```
 
-3. 環境変数を設定
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-```
-
-## 🚀 使用方法
-
-### 1. データ準備
-
-以下のファイルを準備してください：
-
-- **CSVファイル**: アルゴリズムの検知結果
-- **仕様書**: アルゴリズムの動作仕様（Markdown形式）
-- **ソースコード**: アルゴリズムの実装（Python）
-- **期待値**: 自然言語で記述された期待する結果
-
-### 2. システム起動
+### Pythonコードからの使用
 
 ```python
-from langchain_mcp_adapters import MultiServerMCPClient
+from ai_analysis_engine.orchestrator.orchestrator import Orchestrator
+from ai_analysis_engine.config.settings import Settings
 
-# Jupyter Notebookに接続
-client = MultiServerMCPClient(
-    servers={
-        "jupyter": {
-            "transport": "streamable_http",
-            "server_url": "http://localhost:8888",
-            "document_url": "http://localhost:8888",
-            "runtime_url": "http://localhost:8888",
-            "document_id": "analysis.ipynb",
-            "document_token": "YOUR_TOKEN",
-            "runtime_token": "YOUR_TOKEN",
-        }
-    }
-)
-tools = client.load_tools()
+# 設定の読み込み
+settings = Settings()
+
+# Orchestratorの初期化
+orchestrator = Orchestrator(settings)
+
+# 分析実行
+result = orchestrator.run_analysis()
+
+# 結果の確認
+if result['status'] == 'success':
+    print(f"正解率: {result['integrated_results']['performance_summary']['accuracy']}")
+    print(f"レポート: {result['report_path']}")
 ```
 
-### 3. 解析実行
+## 設定ファイル
 
-```python
-# 期待値を解釈
-expected_value = "フレーム10では値が5であるべき"
-
-# データ解析
-code = """
-import pandas as pd
-df = pd.read_csv('data.csv')
-expected = {'frame': 10, 'expected_value': 5}
-result = df[df['frame'] == expected['frame']]
-result['difference'] = result['value'] - expected['expected_value']
-"""
-
-# 結果をNotebookに追加
-tools['insert_execute_code_cell'](code)
-```
-
-## 📊 入力例
-
-### CSVファイル (data.csv)
-```csv
-frame,value
-1,3
-2,4
-10,15
-```
-
-### 仕様書 (spec.md)
-```markdown
-## 仕様
-- フレーム10の値は5になるべき
-- 値は単調増加するべき
-```
-
-### ソースコード (source.py)
-```python
-def detect_value(frame):
-    if frame == 10:
-        return 15  # 仕様では5のはずがバグで15
-    return frame
-```
-
-### 期待値
-```
-フレーム10では値が5であるべき
-```
-
-## 📈 出力例
-
-Jupyter Notebookに以下の内容が生成されます：
-
-- **異常箇所**: フレーム10で値が15（期待値は5）
-- **差分**: 10
-- **原因**: ソースコードの条件分岐ミス
-- **グラフ**: 異常の視覚化
-- **サマリ**: 初心者向けの解説
-
-## 🔧 設定
-
-### 環境変数
-
-| 変数名 | 説明 | 必須 |
-|--------|------|------|
-| `OPENAI_API_KEY` | OpenAI APIキー | ✅ |
-| `JUPYTER_TOKEN` | Jupyter Notebookトークン | ✅ |
-
-### 設定ファイル
-
-`config.yaml`で詳細設定が可能です：
+### デフォルト設定 (config/default_config.yaml)
 
 ```yaml
-jupyter:
-  server_url: "http://localhost:8888"
-  document_id: "analysis.ipynb"
-  
-openai:
-  model: "gpt-4"
+global:
+  database_path: ../DataWareHouse/database.db
+  datawarehouse_path: ../DataWareHouse/
+  templates_path: ./templates/
+
+orchestrator:
+  max_parallel_instances: 4
+  timeout_seconds: 900
+
+performance_analyzer:
+  metrics:
+    - accuracy
+    - over_detection_count_per_hour
+  visualization_level: standard
+
+instance_analyzer:
+  max_hypothesis_attempts: 3
+  llm_model: gpt-4
   temperature: 0.1
-  
-analysis:
-  max_anomalies: 10
-  visualization: true
+  drowsy_detection:
+    left_eye_close_threshold: 0.10
+    right_eye_close_threshold: 0.10
+    continuous_close_time: 1.00
+    face_conf_threshold: 0.75
 ```
 
-## 🤝 貢献
+## プロジェクト構造
 
-プロジェクトへの貢献を歓迎します！
+```
+ai_analysis_engine/
+├── src/ai_analysis_engine/
+│   ├── orchestrator/          # Orchestratorクラス
+│   ├── performance_analyzer/  # PerformanceAnalyzerクラス
+│   ├── instance_analyzer/     # InstanceAnalyzerクラス
+│   ├── utils/                 # ユーティリティ関数
+│   └── config/                # 設定管理
+├── config/                    # 設定ファイル
+├── templates/                 # レポートテンプレート
+├── tests/                     # テストコード
+├── scripts/                   # 実行スクリプト
+├── outputs/                   # 分析結果出力
+│   ├── reports/              # 最終レポート
+│   ├── charts/               # 図表ファイル
+│   └── data/                 # 分析データ
+└── logs/                     # 実行ログ
+```
+
+## 出力成果物
+
+### 最終レポート (Markdown)
+- 全体性能サマリー
+- 個別データ分析結果
+- 改善提案
+- 可視化グラフへのリンク
+
+### 図表ファイル (PNG)
+- 時系列分析グラフ
+- 混同行列
+- 性能比較チャート
+
+### 分析データ (JSON)
+- 詳細な分析結果
+- 指標データ
+- 改善提案データ
+
+## drowsy_detectionアルゴリズム仕様
+
+本システムは、以下のアルゴリズム仕様に基づいて期待値を生成します：
+
+- **入力**: frame_num, left_eye_open, right_eye_open, face_confidence
+- **出力**: is_drowsy (1: 連続閉眼, 0: 非連続閉眼, -1: エラー)
+- **パラメータ**:
+  - 左目閉眼閾値: 0.10
+  - 右目閉眼閾値: 0.10
+  - 連続閉眼時間: 1.00秒
+  - 顔検出信頼度閾値: 0.75
+
+## DataWareHouse連携
+
+- **データ取得**: `algorithm_output_table`から評価結果を取得
+- **結果保存**: `05_analysis_output/`配下に分析結果を保存
+- **データベース更新**: 分析結果を適切なテーブルに登録
+
+## 開発・テスト
+
+### テスト実行
+
+```bash
+# 単体テスト
+python -m pytest tests/unit/ -v
+
+# 統合テスト
+python -m pytest tests/integration/ -v
+
+# カバレッジレポート
+python -m pytest --cov=src/ai_analysis_engine tests/
+```
+
+### 開発環境設定
+
+```bash
+# 開発依存関係のインストール
+uv pip install -e .[dev]
+
+# リンター実行
+flake8 src/
+
+# フォーマッター実行
+black src/
+```
+
+## ライセンス
+
+MIT License
+
+## 貢献
 
 1. このリポジトリをフォーク
 2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
 3. 変更をコミット (`git commit -m 'Add amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
+4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Requestを作成
 
-## 📝 ライセンス
+## 連絡先
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
-
-## 📞 サポート
-
-- **Issues**: [GitHub Issues](https://github.com/your-username/ai_analysis_engine/issues)
-- **ドキュメント**: [詳細仕様書](仕様書_サンプル_byGrok.md)
-- **メール**: support@example.com
-
-## 🗓️ 更新履歴
-
-### v1.0.0 (2025-08-05)
-- 初回リリース
-- 基本的な異常検出機能
-- Jupyter Notebook統合
-- 自然言語処理対応
-
-## 🙏 謝辞
-
-- [LangChain](https://langchain.com/) - AIエージェントフレームワーク
-- [OpenAI](https://openai.com/) - 自然言語処理API
-- [Jupyter](https://jupyter.org/) - ノートブック環境
-
----
-
-**開発者**: AI Analysis Engine Team  
-**最終更新**: 2025年8月5日 
+プロジェクトに関する質問や提案は、Issueを作成してください。
