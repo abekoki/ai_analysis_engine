@@ -12,7 +12,7 @@ import json
 
 # DataWareHouseのAPIをインポート
 datawarehouse_path = Path(__file__).parent.parent.parent.parent / "DataWareHouse"
-if str(datawarehouse_path) not in sys.path:
+if datawarehouse_path.exists() and str(datawarehouse_path) not in sys.path:
     sys.path.insert(0, str(datawarehouse_path))
 
 try:
@@ -22,6 +22,13 @@ try:
         list_algorithm_outputs,
         get_latest_algorithm_version
     )
+    from datawarehouse.evaluation_api import (
+        list_evaluation_results,
+        list_evaluation_data,
+        get_evaluation_result,
+    )
+    from datawarehouse.core_lib_api import get_core_lib_output
+    from datawarehouse.tag_api import get_video_tags
     from datawarehouse.analysis_api import (
         create_analysis_result,
         get_analysis_result,
@@ -49,7 +56,7 @@ class DataWareHouseConnector:
         Args:
             db_path: データベースファイルのパス
         """
-        self.db_path = str(Path(db_path))
+        self.db_path = Path(db_path)
         if not DWH_AVAILABLE:
             raise RuntimeError("DataWareHouse APIが利用できません。DataWareHouseが正しくインストールされているか確認してください。")
 
@@ -82,11 +89,15 @@ class DataWareHouseConnector:
                 algorithm_output_id = outputs[-1]['algorithm_output_ID']  # 最新の出力
 
             # 指定されたアルゴリズム出力を取得
-            output_data = get_algorithm_output(algorithm_output_id, self.db_path)
+            output_data = get_algorithm_output(algorithm_output_id, str(self.db_path))
 
-            # 評価結果ファイルを読み込み
+            # 評価結果ファイルを読み込み（アルゴリズム出力ディレクトリ優先、無ければ評価出力をフォールバック）
             algorithm_output_dir = output_data['algorithm_output_dir']
-            evaluation_df = self.load_evaluation_results(algorithm_output_dir)
+            try:
+                evaluation_df = self.load_evaluation_results(algorithm_output_dir)
+            except FileNotFoundError:
+                # 評価結果テーブルから該当algorithm_output_idの評価データCSVを探索
+                evaluation_df = self._load_eval_data_from_evaluation_tables(algorithm_output_id)
 
             return {
                 'metadata': output_data,
@@ -96,6 +107,51 @@ class DataWareHouseConnector:
 
         except Exception as e:
             raise RuntimeError(f"評価データの取得に失敗しました: {str(e)}")
+
+    def get_evaluation_data_by_result_id(self, evaluation_result_id: int) -> Dict[str, Any]:
+        """evaluation_result_ID を指定して評価データを取得
+
+        Args:
+            evaluation_result_id: 評価結果ID（evaluation_result_table）
+
+        Returns:
+            評価データ辞書 {metadata, data, evaluation_result_id}
+        """
+        try:
+            # メタデータ取得
+            eval_result = get_evaluation_result(evaluation_result_id, db_path=str(self.db_path))
+
+            # 個別データの一覧を取得
+            rows = list_evaluation_data(evaluation_result_id, db_path=str(self.db_path))
+            if not rows:
+                raise FileNotFoundError(f"evaluation_result_ID={evaluation_result_id} に紐づく評価データが見つかりません")
+
+            # evaluation_data_path のCSVを読み込み（タスクレベル解析用）
+            dataframes: List[pd.DataFrame] = []
+            for row in rows:
+                rel_path = row.get('evaluation_data_path')
+                if not rel_path:
+                    continue
+                p = self.db_path.parent / rel_path
+                if p.exists():
+                    try:
+                        df = pd.read_csv(p)
+                        dataframes.append(self._normalize_schema(df))
+                    except Exception:
+                        continue
+
+            if not dataframes:
+                raise FileNotFoundError(f"evaluation_result_ID={evaluation_result_id} の評価CSVが見つからないか読み込めません")
+
+            evaluation_df = pd.concat(dataframes, ignore_index=True)
+
+            return {
+                'metadata': eval_result,
+                'data': evaluation_df,
+                'evaluation_result_id': evaluation_result_id,
+            }
+        except Exception as e:
+            raise RuntimeError(f"evaluation_result_IDからの評価データ取得に失敗しました: {str(e)}")
 
     def load_evaluation_results(self, algorithm_output_dir: str) -> pd.DataFrame:
         """評価結果ファイルを読み込み
@@ -114,7 +170,8 @@ class DataWareHouseConnector:
 
         # CSVファイルとして読み込み（実際のフォーマットに合わせて調整）
         if result_path.is_file():
-            return pd.read_csv(result_path)
+            df = pd.read_csv(result_path)
+            return self._normalize_schema(df)
         else:
             # ディレクトリ内のファイルを検索
             csv_files = list(result_path.glob("*.csv"))
@@ -122,7 +179,97 @@ class DataWareHouseConnector:
                 raise FileNotFoundError(f"評価結果CSVファイルが見つかりません: {result_path}")
 
             # 最初のCSVファイルを読み込み
-            return pd.read_csv(csv_files[0])
+            df = pd.read_csv(csv_files[0])
+            return self._normalize_schema(df)
+
+    def _load_eval_data_from_evaluation_tables(self, algorithm_output_id: int) -> pd.DataFrame:
+        """評価テーブルからalgorithm_output_idに紐づくCSVを収集して読み込み
+
+        Args:
+            algorithm_output_id: アルゴリズム出力ID
+
+        Returns:
+            連結済みの評価DataFrame
+        """
+        collected_paths: List[Path] = []
+
+        # 全評価結果を走査して、該当algorithm_output_idの評価データを収集
+        results = list_evaluation_results(db_path=str(self.db_path))
+        for r in results:
+            eval_id = r.get('evaluation_result_ID')
+            try:
+                rows = list_evaluation_data(eval_id, db_path=str(self.db_path))
+            except Exception:
+                continue
+            for row in rows:
+                if row.get('algorithm_output_ID') == algorithm_output_id:
+                    rel_path = row.get('evaluation_data_path')
+                    if not rel_path:
+                        continue
+                    p = self.db_path.parent / rel_path
+                    if p.exists():
+                        collected_paths.append(p)
+
+        if not collected_paths:
+            raise FileNotFoundError(
+                f"該当algorithm_output_ID={algorithm_output_id}の評価データCSVが見つかりません"
+            )
+
+        # 読み込みと連結
+        dataframes: List[pd.DataFrame] = []
+        for p in collected_paths:
+            try:
+                df = pd.read_csv(p)
+                dataframes.append(self._normalize_schema(df))
+            except Exception:
+                continue
+
+        if not dataframes:
+            raise FileNotFoundError(
+                f"評価データCSVは検出されましたが読み込みに失敗しました: {collected_paths}"
+            )
+
+        return pd.concat(dataframes, ignore_index=True)
+
+    def _normalize_schema(self, df: pd.DataFrame) -> pd.DataFrame:
+        """評価CSVの列を本ツールの期待スキーマに正規化する。
+
+        期待スキーマ:
+          - frame_num (int)
+          - left_eye_open (float: 0.0~1.0)
+          - right_eye_open (float: 0.0~1.0)
+          - face_confidence (float: 0.0~1.0, 無ければ1.0)
+          - is_drowsy (int: 0/1)
+        """
+        if df is None or df.empty:
+            return df
+
+        result = df.copy()
+
+        # left_eye_open / right_eye_open の補完（left/right_eye_closed から生成）
+        if 'left_eye_open' not in result.columns and 'left_eye_closed' in result.columns:
+            result['left_eye_open'] = (~result['left_eye_closed'].astype(bool)).astype(float)
+        if 'right_eye_open' not in result.columns and 'right_eye_closed' in result.columns:
+            result['right_eye_open'] = (~result['right_eye_closed'].astype(bool)).astype(float)
+
+        # face_confidence が無ければ 1.0 をデフォルト設定
+        if 'face_confidence' not in result.columns:
+            result['face_confidence'] = 1.0
+
+        # 型の安定化
+        for col in ['left_eye_open', 'right_eye_open', 'face_confidence']:
+            if col in result.columns:
+                result[col] = result[col].astype(float)
+
+        # is_drowsy の型をintに
+        if 'is_drowsy' in result.columns:
+            try:
+                result['is_drowsy'] = result['is_drowsy'].astype(int)
+            except Exception:
+                # True/False などは bool->int へ
+                result['is_drowsy'] = result['is_drowsy'].astype(bool).astype(int)
+
+        return result
 
     def save_analysis_results(self, results: Dict[str, Any],
                             algorithm_output_id: int,
@@ -144,23 +291,29 @@ class DataWareHouseConnector:
         output_path = Path(self.db_path).parent / output_dir
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # JSONファイルとして保存
+        # JSONファイルとして保存（Python組み込み型に正規化）
         json_path = output_path / "analysis_results.json"
         with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
+            json.dump(self._to_serializable(results), f, ensure_ascii=False, indent=2)
 
         # DataWareHouseに分析結果を登録
-        try:
-            analysis_result_id = create_analysis_result(
-                analysis_result_dir=output_dir,
-                evaluation_result_id=algorithm_output_id,
-                analysis_timestamp=timestamp,
-                db_path=self.db_path
-            )
-            return analysis_result_id
-        except Exception as e:
-            # DataWareHouseへの登録が失敗してもファイルは保存されている
-            raise RuntimeError(f"分析結果のDataWareHouse登録に失敗しました: {str(e)}")
+        # DataWareHouseへの登録（軽いリトライ付き）
+        last_err = None
+        for attempt in range(3):
+            try:
+                analysis_result_id = create_analysis_result(
+                    analysis_result_dir=output_dir,
+                    evaluation_result_id=algorithm_output_id,
+                    analysis_timestamp=timestamp,
+                    db_path=self.db_path
+                )
+                return analysis_result_id
+            except Exception as e:
+                last_err = e
+                import time
+                time.sleep(0.5 * (attempt + 1))
+        # 失敗
+        raise RuntimeError(f"分析結果のDataWareHouse登録に失敗しました: {last_err}")
 
     def create_problem_record(self, problem_name: str, problem_description: str,
                             problem_status: str, analysis_result_id: int) -> int:
@@ -217,3 +370,90 @@ class DataWareHouseConnector:
             )
         except Exception as e:
             raise RuntimeError(f"分析データの登録に失敗しました: {str(e)}")
+
+    def _to_serializable(self, obj: Any) -> Any:
+        """JSONシリアライズ可能なPython型に変換"""
+        import numpy as np
+        if isinstance(obj, dict):
+            return {self._to_serializable(k): self._to_serializable(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._to_serializable(v) for v in obj]
+        if isinstance(obj, tuple):
+            return [self._to_serializable(v) for v in obj]
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, (np.ndarray,)):
+            return obj.tolist()
+        return obj
+
+    def build_task_level_dataframe(self, evaluation_result_id: int) -> pd.DataFrame:
+        """evaluation_result_IDに紐づくタグ単位のタスク行を構築する
+
+        各タスク行: task_id, video_ID, tag_ID, start, end, expected_is_drowsy(=1), is_drowsy(=区間内に1があるか)
+        """
+        rows = list_evaluation_data(evaluation_result_id, db_path=str(self.db_path))
+        tasks: List[Dict[str, Any]] = []
+
+        # キャッシュ: algo_out_id -> concatenated frame df
+        frames_cache: Dict[int, pd.DataFrame] = {}
+
+        for r in rows:
+            algo_out_id = r.get('algorithm_output_ID')
+            if algo_out_id is None:
+                continue
+            try:
+                algo_out = get_algorithm_output(algo_out_id, str(self.db_path))
+                core_out_id = algo_out.get('core_lib_output_ID')
+                core_out = get_core_lib_output(core_out_id, str(self.db_path))
+                video_id = core_out.get('video_ID')
+
+                # フレームCSVを読み込み（結合）
+                if algo_out_id not in frames_cache:
+                    rel_dir = algo_out.get('algorithm_output_dir')
+                    d = self.db_path.parent / rel_dir
+                    dfs: List[pd.DataFrame] = []
+                    if d.exists():
+                        for p in sorted(d.glob('*.csv')):
+                            try:
+                                dfp = pd.read_csv(p)
+                                dfs.append(dfp)
+                            except Exception:
+                                continue
+                    frames_cache[algo_out_id] = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+                frame_df = frames_cache.get(algo_out_id, pd.DataFrame()).copy()
+                # カラムの正規化
+                if not frame_df.empty and 'frame_num' not in frame_df.columns:
+                    if 'frame' in frame_df.columns:
+                        frame_df = frame_df.rename(columns={'frame': 'frame_num'})
+
+                # タグ一覧を取得
+                tags = get_video_tags(video_id, db_path=str(self.db_path))
+                for tg in tags:
+                    start = tg.get('start', 0)
+                    end = tg.get('end', -1)
+                    detected = 0
+                    if not frame_df.empty and {'frame_num', 'is_drowsy'}.issubset(set(frame_df.columns)):
+                        seg = frame_df[(frame_df['frame_num'] >= start) & (frame_df['frame_num'] <= end)]
+                        if not seg.empty:
+                            detected = int((seg['is_drowsy'] == 1).any())
+
+                    task_row = {
+                        'task_id': f"{video_id}_{tg.get('tag_ID')}",
+                        'video_ID': video_id,
+                        'tag_ID': tg.get('tag_ID'),
+                        'task_ID': tg.get('task_ID'),
+                        'start': start,
+                        'end': end,
+                        'expected_is_drowsy': 1,
+                        'is_drowsy': detected,
+                    }
+                    tasks.append(task_row)
+            except Exception:
+                continue
+
+        return pd.DataFrame(tasks)

@@ -1,0 +1,9 @@
+2025-09-02 13:26:14,320 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-09-02 13:26:14,320 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for algorithm_output_id: 36
+2025-09-02 13:26:14,329 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 3 records
+2025-09-02 13:26:14,329 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-09-02 13:26:15,953 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'accuracy': 0.9961575408261287, 'total_samples': 1041, 'correct_predictions': 1037, 'incorrect_predictions': 4, 'over_detection_count_per_hour': 0.0, 'avg_continuous_drowsy_time': 2.202706027060271, 'total_drowsy_time_seconds': 596.9333333333334, 'avg_face_confidence': 1.0, 'min_face_confidence': 1.0}
+2025-09-02 13:26:15,953 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-09-02 13:26:16,100 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 11 instances analyzed
+2025-09-02 13:26:16,100 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Failed to save results to DataWareHouse: Object of type int64 is not JSON serializable
+2025-09-02 13:26:16,100 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

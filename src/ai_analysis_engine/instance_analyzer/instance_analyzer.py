@@ -92,20 +92,27 @@ class InstanceAnalyzer:
         Returns:
             インスタンスIDをキーとしたDataFrame辞書
         """
-        # 簡易的な分割: 連続したフレームを1つのインスタンスとする
-        # 実際のユースケースでは、より適切な分割ロジックを実装
+        instances: Dict[str, pd.DataFrame] = {}
 
-        instances = {}
+        # タスクレベル（frame_numが無い）: 1行=1タスクとして扱う or task_idでグルーピング
+        if 'frame_num' not in df.columns:
+            if 'task_id' in df.columns:
+                for task_value, g in df.groupby('task_id'):
+                    instance_id = f"task_{str(task_value)}"
+                    instances[instance_id] = g.reset_index(drop=True)
+            else:
+                for idx, row in df.reset_index(drop=True).iterrows():
+                    instance_id = f"task_{idx:03d}"
+                    instances[instance_id] = pd.DataFrame([row])
+            return instances
+
+        # フレームレベル: 連続したフレームを1つのインスタンスにまとめる（固定長分割）
         current_instance = []
         instance_counter = 0
 
-        # フレーム番号でソート
         df_sorted = df.sort_values('frame_num').reset_index(drop=True)
-
         for _, row in df_sorted.iterrows():
             current_instance.append(row)
-
-            # 一定数のフレームごとにインスタンスを分割（例: 100フレームごと）
             if len(current_instance) >= 100:
                 instance_df = pd.DataFrame(current_instance)
                 instance_id = f"instance_{instance_counter:03d}"
@@ -113,7 +120,6 @@ class InstanceAnalyzer:
                 current_instance = []
                 instance_counter += 1
 
-        # 残りのデータを追加
         if current_instance:
             instance_df = pd.DataFrame(current_instance)
             instance_id = f"instance_{instance_counter:03d}"
@@ -134,14 +140,23 @@ class InstanceAnalyzer:
             分析結果辞書
         """
         try:
-            # 期待値の生成
-            df_with_expectations = self.expectation_generator.detect_continuous_closure(instance_df)
+            # 期待値の生成（フレーム列がある場合のみ）。タスクレベルはそのまま扱う
+            required_cols = {'left_eye_open', 'right_eye_open', 'face_confidence'}
+            if required_cols.issubset(set(instance_df.columns)):
+                df_with_expectations = self.expectation_generator.detect_continuous_closure(instance_df)
+            else:
+                df_with_expectations = instance_df.copy()
+                if 'expected_is_drowsy' not in df_with_expectations.columns:
+                    df_with_expectations['expected_is_drowsy'] = 1
 
             # 仮説生成と検証
             hypothesis_results = self._generate_and_verify_hypothesis(df_with_expectations, evaluation_data)
 
-            # 異常検知
-            anomalies = self._detect_anomalies(df_with_expectations)
+            # 異常検知（列が足りない場合はスキップ）
+            try:
+                anomalies = self._detect_anomalies(df_with_expectations)
+            except Exception:
+                anomalies = []
 
             # レポート生成
             instance_report = self._generate_instance_report(instance_id, df_with_expectations,
@@ -299,8 +314,11 @@ class InstanceAnalyzer:
         """
         # 基本統計
         total_frames = len(df)
-        drowsy_frames = (df['is_drowsy'] == 1).sum()
-        expected_drowsy_frames = (df['expected_is_drowsy'] == 1).sum()
+        drowsy_frames = int((df['is_drowsy'] == 1).sum()) if 'is_drowsy' in df.columns else 0
+        expected_drowsy_frames = int((df['expected_is_drowsy'] == 1).sum()) if 'expected_is_drowsy' in df.columns else 0
+
+        # 図表の生成（タスクレベルの場合は簡易バー、フレームレベルの場合は連続時間を利用）
+        chart_path = self._create_instance_chart(instance_id, df)
 
         report = f"""# 個別データ分析レポート - {instance_id}
 
@@ -308,6 +326,7 @@ class InstanceAnalyzer:
 - 総フレーム数: {total_frames}
 - 検知された居眠りフレーム数: {drowsy_frames}
 - 期待される居眠りフレーム数: {expected_drowsy_frames}
+ - 図表: {chart_path if chart_path else 'N/A'}
 
 ## 仮説分析
 **仮説**: {hypothesis_results.get('hypothesis', 'N/A')}
@@ -347,7 +366,48 @@ class InstanceAnalyzer:
             if false_negatives:
                 report += "- 未検知を減らすため、アルゴリズムの感度向上を検討してください。\n"
 
+        # レポートをファイルにも保存（タスク/フレーム両対応）
+        report_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "reports" / "instance_reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = instance_id.replace('/', '_')
+        report_file = report_dir / f"{safe_name}.md"
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write(report)
+
         return report
+
+    def _create_instance_chart(self, instance_id: str, df: pd.DataFrame) -> str:
+        """個別データの図表を作成して保存し、パスを返す"""
+        try:
+            import matplotlib.pyplot as plt
+            charts_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "charts" / "instances"
+            charts_dir.mkdir(parents=True, exist_ok=True)
+            output_path = charts_dir / f"{instance_id}.png"
+
+            plt.figure(figsize=(6, 4))
+            if 'frame_num' in df.columns and len(df) > 1:
+                # フレームレベル: 検知と期待の推移
+                plt.plot(df.get('frame_num', range(len(df))), df.get('is_drowsy', 0), label='Detected')
+                if 'expected_is_drowsy' in df.columns:
+                    plt.plot(df.get('frame_num', range(len(df))), df['expected_is_drowsy'], label='Expected', linestyle='--')
+                plt.xlabel('Frame')
+                plt.ylabel('Drowsy (0/1)')
+                plt.title(f'{instance_id} Drowsiness over time')
+                plt.legend()
+            else:
+                # タスクレベル: 期待 vs 実測（バー）
+                expected = int(df.get('expected_is_drowsy', pd.Series([0])).iloc[0]) if 'expected_is_drowsy' in df.columns else 0
+                actual = int(df.get('is_drowsy', pd.Series([0])).iloc[0]) if 'is_drowsy' in df.columns else 0
+                plt.bar(['Expected', 'Detected'], [expected, actual], color=['gray', 'blue'])
+                plt.ylim(0, 1)
+                plt.title(f'{instance_id} Expected vs Detected')
+
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            return str(output_path)
+        except Exception:
+            return ""
 
     def _generate_instance_summary(self, df: pd.DataFrame,
                                  anomalies: List[Dict[str, Any]]) -> Dict[str, Any]:

@@ -55,11 +55,23 @@ class PerformanceAnalyzer:
             if df is None or df.empty:
                 raise ValueError("評価データが空です")
 
-            # 期待値の生成
-            df_with_expectations = self.expectation_generator.detect_continuous_closure(df)
-
-            # 指標の計算
-            metrics_results = self._calculate_metrics(df_with_expectations)
+            # カラムによって処理を分岐（フレームレベル or タスクレベル）
+            required_cols = {'left_eye_open', 'right_eye_open', 'face_confidence'}
+            if required_cols.issubset(set(df.columns)):
+                # フレームレベル
+                df_with_expectations = self.expectation_generator.detect_continuous_closure(df)
+                metrics_results = self._calculate_metrics(df_with_expectations)
+            else:
+                # タスクレベル: 期待値生成なしで基本指標のみ
+                df_with_expectations = df.copy()
+                metrics_results = {'total_samples': len(df_with_expectations)}
+                if {'expected_is_drowsy', 'is_drowsy'}.issubset(set(df_with_expectations.columns)):
+                    acc = (df_with_expectations['expected_is_drowsy'] == df_with_expectations['is_drowsy']).mean()
+                    metrics_results.update({
+                        'accuracy': float(acc),
+                        'correct_predictions': int((df_with_expectations['expected_is_drowsy'] == df_with_expectations['is_drowsy']).sum()),
+                        'incorrect_predictions': int((df_with_expectations['expected_is_drowsy'] != df_with_expectations['is_drowsy']).sum()),
+                    })
 
             # ベースライン比較
             baseline_comparison = self._compare_with_baseline(metrics_results)
@@ -215,8 +227,8 @@ class PerformanceAnalyzer:
             charts_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "charts"
             charts_dir.mkdir(parents=True, exist_ok=True)
 
-            # 時系列グラフ
-            if self.visualization_level in ['standard', 'detailed']:
+            # 時系列グラフ（frame_numがある場合のみ）
+            if self.visualization_level in ['standard', 'detailed'] and 'frame_num' in df.columns:
                 time_series_path = self._create_time_series_plot(df, charts_dir)
                 visualization_paths['time_series'] = str(time_series_path)
 

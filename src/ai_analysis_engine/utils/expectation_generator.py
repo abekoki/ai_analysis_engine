@@ -64,8 +64,8 @@ class ExpectationGenerator:
         if df.empty:
             return df.copy()
 
-        # 必要な列が存在するかチェック
-        required_columns = ['frame_num', 'left_eye_open', 'right_eye_open', 'face_confidence']
+        # 必要な列が存在するかチェック（タスクレベルCSVはframe_numが無い場合があるため任意扱い）
+        required_columns = ['left_eye_open', 'right_eye_open', 'face_confidence']
         missing_columns = [col for col in required_columns if col not in df.columns]
 
         if missing_columns:
@@ -105,15 +105,17 @@ class ExpectationGenerator:
             return df.copy()
 
         result_df = df.copy()
-        result_df = result_df.sort_values('frame_num').reset_index(drop=True)
+        if 'frame_num' in result_df.columns:
+            result_df = result_df.sort_values('frame_num').reset_index(drop=True)
 
         # 連続閉眼カウンタ
         continuous_count = 0
         continuous_frames = []
 
         for i, row in result_df.iterrows():
+            frame_num = row['frame_num'] if 'frame_num' in result_df.columns else i
             frame_data = {
-                'frame_num': row['frame_num'],
+                'frame_num': frame_num,
                 'left_eye_open': row['left_eye_open'],
                 'right_eye_open': row['right_eye_open'],
                 'face_confidence': row['face_confidence']
@@ -123,7 +125,7 @@ class ExpectationGenerator:
 
             if expectation == 1:  # 両目閉眼
                 continuous_count += 1
-                continuous_frames.append(row['frame_num'])
+                continuous_frames.append(frame_num)
             else:
                 continuous_count = 0
                 continuous_frames = []
@@ -134,6 +136,7 @@ class ExpectationGenerator:
 
             result_df.at[i, 'expected_is_drowsy'] = is_continuous_drowsy
             result_df.at[i, 'continuous_count'] = continuous_count
+            # frame_numが無いCSVにも連続時間を記録
             result_df.at[i, 'continuous_time'] = continuous_time
 
         return result_df

@@ -1,0 +1,11 @@
+2025-09-02 13:42:17,401 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-09-02 13:42:17,401 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-09-02 13:42:17,442 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 5064 records
+2025-09-02 13:42:17,442 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-09-02 13:42:18,623 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'accuracy': 0.5667456556082149, 'total_samples': 5064, 'correct_predictions': 2870, 'incorrect_predictions': 2194, 'over_detection_count_per_hour': 18063.981042654028, 'avg_continuous_drowsy_time': 0.1863069016152717, 'total_drowsy_time_seconds': 169.16666666666669, 'avg_face_confidence': 1.0, 'min_face_confidence': 1.0}
+2025-09-02 13:42:18,625 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-09-02 13:42:19,242 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 51 instances analyzed
+2025-09-02 13:42:19,242 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\reports\analysis_report_20250902_134219.md
+2025-09-02 13:42:19,242 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Failed to export data artifacts: Object of type int64 is not JSON serializable
+2025-09-02 13:42:24,878 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Failed to save results to DataWareHouse: 分析結果のDataWareHouse登録に失敗しました: database is locked
+2025-09-02 13:42:24,878 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully
