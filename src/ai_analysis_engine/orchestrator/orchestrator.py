@@ -14,6 +14,15 @@ from ..config.settings import Settings
 from ..performance_analyzer.performance_analyzer import PerformanceAnalyzer
 from ..instance_analyzer.instance_analyzer import InstanceAnalyzer
 from ..utils.data_loader import DataWareHouseConnector
+import shutil
+
+try:
+    # 遅延インポート（未インストール環境向けに安全に）
+    from jinja2 import Environment, FileSystemLoader, select_autoescape  # type: ignore
+except Exception:  # pragma: no cover
+    Environment = None  # type: ignore
+    FileSystemLoader = None  # type: ignore
+    select_autoescape = None  # type: ignore
 
 
 class Orchestrator:
@@ -26,6 +35,7 @@ class Orchestrator:
         """
         self.settings = settings or Settings()
         self.logger = self._setup_logger()
+        self.run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         # 各エージェントの初期化
         self.performance_analyzer = PerformanceAnalyzer(self.settings)
@@ -99,10 +109,19 @@ class Orchestrator:
             # 4. 結果を統合
             integrated_results = self._integrate_results(performance_results, instance_results)
 
-            # 5. 最終レポートを生成
+            # 5. 最終レポートを生成（Jinja2対応）
             report_path = self._generate_final_report(integrated_results)
 
-            # 6. 結果をDataWareHouseに保存
+            # 5.5 JSON成果物を出力
+            data_artifacts = self._export_data_artifacts(integrated_results)
+
+            # 5.6 成果物をDataWareHouse配下にも同期
+            try:
+                self._sync_artifacts_to_dwh(report_path, data_artifacts)
+            except Exception as e:
+                self.logger.error(f"Failed to sync artifacts to DWH: {str(e)}")
+
+            # 6. 結果をDataWareHouseに保存（JSON登録）
             self._save_results_to_datawarehouse(integrated_results, evaluation_data)
 
             final_result = {
@@ -268,17 +287,26 @@ class Orchestrator:
         """最終レポートを生成"""
         try:
             # レポートテンプレートの読み込み
-            template_path = Path(__file__).parent.parent.parent.parent / "templates" / "report_template.md.j2"
-            # 現段階ではテンプレート未対応。存在しなくても必ずファイル出力する
-            if not template_path.exists():
-                report_content = self._generate_simple_report(integrated_results)
+            templates_dir = Path(self.settings.get('global.templates_path', './templates/'))
+            template_path = templates_dir / "report_template.md.j2"
+            if Environment is not None and template_path.exists():
+                env = Environment(
+                    loader=FileSystemLoader(str(templates_dir)),
+                    autoescape=select_autoescape(disabled_extensions=(".md", ".j2"))
+                )
+                template = env.get_template("report_template.md.j2")
+                report_content = template.render(
+                    performance_summary=integrated_results.get('performance_summary', {}),
+                    instance_summaries=integrated_results.get('instance_summaries', []),
+                    recommendations=integrated_results.get('recommendations', []),
+                    analysis_timestamp=integrated_results.get('analysis_timestamp', datetime.now().isoformat())
+                )
             else:
-                # TODO: Jinja2テンプレートを使用したレポート生成を実装
+                # フォールバック（テンプレートがない/未インストール時）
                 report_content = self._generate_simple_report(integrated_results)
 
             # レポート保存
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_filename = f"analysis_report_{timestamp}.md"
+            report_filename = f"analysis_report_{self.run_timestamp}.md"
             report_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "reports"
             report_dir.mkdir(parents=True, exist_ok=True)
             report_path = report_dir / report_filename
@@ -391,3 +419,50 @@ class Orchestrator:
         except Exception as e:
             self.logger.error(f"Failed to save results to DataWareHouse: {str(e)}")
             # 保存失敗時は処理を継続（ログに記録済み）
+
+    def _sync_artifacts_to_dwh(self, report_path: Path, data_artifacts: Dict[str, str]) -> None:
+        """レポート/図表/JSONをDataWareHouseの05_analysis_output配下に同期する"""
+        dwh_root = Path(self.settings.get('global.datawarehouse_path', '../DataWareHouse/'))
+        dest_root = dwh_root / '05_analysis_output' / f'analysis_{self.run_timestamp}'
+        dest_root.mkdir(parents=True, exist_ok=True)
+
+        # 1) レポート
+        reports_dest = dest_root / 'reports'
+        reports_dest.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(report_path, reports_dest / report_path.name)
+        except Exception as e:
+            self.logger.error(f"Failed to copy report to DWH: {str(e)}")
+
+        # 2) JSON成果物
+        data_dest = dest_root / 'data'
+        data_dest.mkdir(parents=True, exist_ok=True)
+        for _, p in (data_artifacts or {}).items():
+            try:
+                src = Path(p)
+                if src.exists():
+                    shutil.copy2(src, data_dest / src.name)
+            except Exception as e:
+                self.logger.error(f"Failed to copy data artifact {p} to DWH: {str(e)}")
+
+        # 3) 図表（outputs/charts配下をまるごと同期）
+        charts_src = Path(__file__).parent.parent.parent.parent / 'outputs' / 'charts'
+        charts_dest = dest_root / 'charts'
+        if charts_src.exists():
+            try:
+                if charts_dest.exists():
+                    shutil.rmtree(charts_dest)
+                shutil.copytree(charts_src, charts_dest)
+            except Exception as e:
+                self.logger.error(f"Failed to copy charts to DWH: {str(e)}")
+
+        # 4) 個別レポート
+        inst_src = Path(__file__).parent.parent.parent.parent / 'outputs' / 'reports' / 'instance_reports'
+        inst_dest = reports_dest / 'instance_reports'
+        if inst_src.exists():
+            try:
+                if inst_dest.exists():
+                    shutil.rmtree(inst_dest)
+                shutil.copytree(inst_src, inst_dest)
+            except Exception as e:
+                self.logger.error(f"Failed to copy instance reports to DWH: {str(e)}")

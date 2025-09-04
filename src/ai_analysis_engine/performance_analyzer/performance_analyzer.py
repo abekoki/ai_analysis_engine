@@ -233,9 +233,17 @@ class PerformanceAnalyzer:
                 visualization_paths['time_series'] = str(time_series_path)
 
             # 混同行列
-            if self.visualization_level == 'detailed':
+            if self.visualization_level in ['standard', 'detailed']:
                 confusion_matrix_path = self._create_confusion_matrix_plot(df, charts_dir)
                 visualization_paths['confusion_matrix'] = str(confusion_matrix_path)
+
+            # PRのみ生成（ROCは不要）
+            if self.visualization_level == 'detailed' and {'expected_is_drowsy', 'score'}.issubset(set(df.columns)):
+                try:
+                    pr_path = self._create_pr_curve(df, charts_dir)
+                    visualization_paths['pr_curve'] = str(pr_path)
+                except Exception as e:
+                    self.logger.error(f"Failed to create PR curve: {str(e)}")
 
             # 性能比較チャート
             performance_path = self._create_performance_comparison_plot(metrics, charts_dir)
@@ -362,10 +370,11 @@ class PerformanceAnalyzer:
             plt.ylabel('Value')
             plt.xticks(rotation=45, ha='right')
 
-            # 値のラベルを追加
+            # 値のラベルを追加（数値を動的にフォーマット）
             for bar, val in zip(bars, vals):
+                label = f"{val:.3f}" if isinstance(val, (int, float)) else str(val)
                 plt.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                        '.3f', ha='center', va='bottom')
+                        label, ha='center', va='bottom')
 
         plt.tight_layout()
 
@@ -374,3 +383,50 @@ class PerformanceAnalyzer:
         plt.close()
 
         return output_path
+
+    def _create_roc_curve(self, df: pd.DataFrame, output_dir: Path) -> Path:
+        from sklearn.metrics import roc_curve, auc
+        import matplotlib.pyplot as plt
+
+        y_true = df['expected_is_drowsy'].astype(int)
+        y_score = df['score'].astype(float)
+
+        fpr, tpr, _ = roc_curve(y_true, y_score)
+        roc_auc = auc(fpr, tpr)
+
+        plt.figure(figsize=(6, 6))
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=1, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic')
+        plt.legend(loc="lower right")
+        path = output_dir / 'roc_curve.png'
+        plt.savefig(path, dpi=150, bbox_inches='tight')
+        plt.close()
+        return path
+
+    def _create_pr_curve(self, df: pd.DataFrame, output_dir: Path) -> Path:
+        from sklearn.metrics import precision_recall_curve, average_precision_score
+        import matplotlib.pyplot as plt
+
+        y_true = df['expected_is_drowsy'].astype(int)
+        y_score = df['score'].astype(float)
+
+        precision, recall, _ = precision_recall_curve(y_true, y_score)
+        ap = average_precision_score(y_true, y_score)
+
+        plt.figure(figsize=(6, 6))
+        plt.plot(recall, precision, color='purple', lw=2, label=f'AP = {ap:.2f}')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curve')
+        plt.legend(loc="lower left")
+        path = output_dir / 'pr_curve.png'
+        plt.savefig(path, dpi=150, bbox_inches='tight')
+        plt.close()
+        return path

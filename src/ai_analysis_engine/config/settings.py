@@ -50,6 +50,7 @@ class Settings:
                 "max_hypothesis_attempts": 3,
                 "llm_model": "gpt-4",
                 "temperature": 0.1,
+                "only_problem_instances": True,
                 "drowsy_detection": {
                     "left_eye_close_threshold": 0.10,
                     "right_eye_close_threshold": 0.10,

@@ -12,6 +12,14 @@ from pathlib import Path
 from ..config.settings import Settings
 from ..utils.expectation_generator import ExpectationGenerator
 from ..utils.data_loader import DataWareHouseConnector
+from ..utils.rag_system import RAGSystem
+
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape  # type: ignore
+except Exception:  # pragma: no cover
+    Environment = None  # type: ignore
+    FileSystemLoader = None  # type: ignore
+    select_autoescape = None  # type: ignore
 
 
 class InstanceAnalyzer:
@@ -37,8 +45,10 @@ class InstanceAnalyzer:
         self.max_attempts = settings.get('instance_analyzer.max_hypothesis_attempts', 3)
         self.llm_model = settings.get('instance_analyzer.llm_model', 'gpt-4')
         self.temperature = settings.get('instance_analyzer.temperature', 0.1)
+        self.only_problem_instances = bool(self.settings.get('instance_analyzer.only_problem_instances', True))
 
         self.logger.info("InstanceAnalyzer initialized")
+        self.rag = RAGSystem(self.settings)
 
     def analyze_instances(self, evaluation_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """個別データ分析を実行
@@ -65,6 +75,9 @@ class InstanceAnalyzer:
 
                 try:
                     result = self._analyze_single_instance(instance_id, instance_df, evaluation_data)
+                    # 課題が無いデータを除外（設定で切替）
+                    if self.only_problem_instances and not result.get('summary', {}).get('has_errors', False):
+                        continue
                     results.append(result)
                 except Exception as e:
                     self.logger.error(f"Failed to analyze instance {instance_id}: {str(e)}")
@@ -189,11 +202,12 @@ class InstanceAnalyzer:
         Returns:
             仮説検証結果
         """
-        # 簡易的な仮説生成（実際にはLLMやルールベースの仮説生成を実装）
-        hypothesis = self._generate_basic_hypothesis(df)
+        # LLM/RAG を用いた仮説生成（フォールバックあり）
+        context = {"metadata": evaluation_data.get('metadata', {})}
+        hypothesis = self.rag.generate_hypothesis(df, context)
 
         # 仮説の検証
-        verification = self._verify_hypothesis(hypothesis, df)
+        verification = self.rag.verify_hypothesis(hypothesis, df)
 
         return {
             'hypothesis': hypothesis,
@@ -317,16 +331,42 @@ class InstanceAnalyzer:
         drowsy_frames = int((df['is_drowsy'] == 1).sum()) if 'is_drowsy' in df.columns else 0
         expected_drowsy_frames = int((df['expected_is_drowsy'] == 1).sum()) if 'expected_is_drowsy' in df.columns else 0
 
-        # 図表の生成（タスクレベルの場合は簡易バー、フレームレベルの場合は連続時間を利用）
+        # 図表の生成（タスク/フレーム対応）
         chart_path = self._create_instance_chart(instance_id, df)
+        # pandasaiで時系列の自然言語要約（可能なら）
+        try:
+            narrative = self.rag.pandasai_narrative(df)
+        except Exception:
+            narrative = ""
 
-        report = f"""# 個別データ分析レポート - {instance_id}
+        # テンプレートがあれば使用
+        templates_dir = Path(self.settings.get('global.templates_path', './templates/'))
+        template_file = templates_dir / 'instance_report_template.md.j2'
+        if Environment is not None and template_file.exists():
+            env = Environment(
+                loader=FileSystemLoader(str(templates_dir)),
+                autoescape=select_autoescape(disabled_extensions=(".md", ".j2"))
+            )
+            template = env.get_template('instance_report_template.md.j2')
+            report = template.render(
+                instance_id=instance_id,
+                total_frames=total_frames,
+                drowsy_frames=drowsy_frames,
+                expected_drowsy_frames=expected_drowsy_frames,
+                chart_path=chart_path,
+                hypothesis_results=hypothesis_results,
+                anomalies=anomalies,
+                rag_sources=getattr(self.rag, 'last_sources', [])
+            )
+        else:
+            # フォールバック: 既存のテキスト生成
+            report = f"""# 個別データ分析レポート - {instance_id}
 
 ## 概要
 - 総フレーム数: {total_frames}
 - 検知された居眠りフレーム数: {drowsy_frames}
 - 期待される居眠りフレーム数: {expected_drowsy_frames}
- - 図表: {chart_path if chart_path else 'N/A'}
+- 図表: {chart_path if chart_path else 'N/A'}
 
 ## 仮説分析
 **仮説**: {hypothesis_results.get('hypothesis', 'N/A')}
@@ -337,34 +377,37 @@ class InstanceAnalyzer:
 ## 検知された異常
 """
 
-        if anomalies:
-            for i, anomaly in enumerate(anomalies, 1):
-                report += f"""
+            if anomalies:
+                for i, anomaly in enumerate(anomalies, 1):
+                    report += f"""
 ### 異常{i}: {anomaly['type']}
 - **説明**: {anomaly['description']}
 - **件数**: {anomaly['count']}
 - **深刻度**: {anomaly['severity']}
 """
-                if 'frames' in anomaly:
-                    report += f"- **対象フレーム**: {anomaly['frames'][:5]}..."
-        else:
-            report += "\n異常は検知されませんでした。\n"
+                    if 'frames' in anomaly:
+                        report += f"- **対象フレーム**: {anomaly['frames'][:5]}..."
+            else:
+                report += "\n異常は検知されませんでした。\n"
 
-        report += "\n## 推奨事項\n"
+            if narrative:
+                report += "\n## pandasaiによる時系列要約\n" + narrative + "\n"
 
-        # 推奨事項の生成
-        if anomalies:
-            high_severity = [a for a in anomalies if a.get('severity') == 'high']
-            if high_severity:
-                report += "- 深刻度の高い異常が検知されました。即時の対応を推奨します。\n"
+            report += "\n## 推奨事項\n"
 
-            false_positives = [a for a in anomalies if a.get('type') == 'false_positive']
-            if false_positives:
-                report += "- 過検知を減らすため、閾値の見直しを検討してください。\n"
+            # 推奨事項の生成
+            if anomalies:
+                high_severity = [a for a in anomalies if a.get('severity') == 'high']
+                if high_severity:
+                    report += "- 深刻度の高い異常が検知されました。即時の対応を推奨します。\n"
 
-            false_negatives = [a for a in anomalies if a.get('type') == 'false_negative']
-            if false_negatives:
-                report += "- 未検知を減らすため、アルゴリズムの感度向上を検討してください。\n"
+                false_positives = [a for a in anomalies if a.get('type') == 'false_positive']
+                if false_positives:
+                    report += "- 過検知を減らすため、閾値の見直しを検討してください。\n"
+
+                false_negatives = [a for a in anomalies if a.get('type') == 'false_negative']
+                if false_negatives:
+                    report += "- 未検知を減らすため、アルゴリズムの感度向上を検討してください。\n"
 
         # レポートをファイルにも保存（タスク/フレーム両対応）
         report_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "reports" / "instance_reports"
@@ -384,27 +427,55 @@ class InstanceAnalyzer:
             charts_dir.mkdir(parents=True, exist_ok=True)
             output_path = charts_dir / f"{instance_id}.png"
 
-            plt.figure(figsize=(6, 4))
             if 'frame_num' in df.columns and len(df) > 1:
-                # フレームレベル: 検知と期待の推移
-                plt.plot(df.get('frame_num', range(len(df))), df.get('is_drowsy', 0), label='Detected')
+                # フレームレベル: 説得力のある時系列（3段プロット）
+                plt.figure(figsize=(10, 6))
+                frames = df.get('frame_num', range(len(df)))
+
+                # 1) 目の開眼度
+                ax1 = plt.subplot(3, 1, 1)
+                if 'left_eye_open' in df.columns:
+                    ax1.plot(frames, df['left_eye_open'], label='Left Eye', alpha=0.8)
+                if 'right_eye_open' in df.columns:
+                    ax1.plot(frames, df['right_eye_open'], label='Right Eye', alpha=0.8)
+                ax1.set_ylabel('Eye Openness')
+                ax1.set_title(f'{instance_id} Eye Openness & Confidence & Detection')
+                ax1.grid(True, alpha=0.3)
+                ax1.legend(loc='upper right')
+
+                # 2) 顔検出信頼度
+                ax2 = plt.subplot(3, 1, 2, sharex=ax1)
+                if 'face_confidence' in df.columns:
+                    ax2.plot(frames, df['face_confidence'], color='green', alpha=0.8, label='Face Confidence')
+                ax2.set_ylabel('Confidence')
+                ax2.grid(True, alpha=0.3)
+                ax2.legend(loc='upper right')
+
+                # 3) 検知 vs 期待
+                ax3 = plt.subplot(3, 1, 3, sharex=ax1)
+                ax3.plot(frames, df.get('is_drowsy', 0), label='Detected', alpha=0.9)
                 if 'expected_is_drowsy' in df.columns:
-                    plt.plot(df.get('frame_num', range(len(df))), df['expected_is_drowsy'], label='Expected', linestyle='--')
-                plt.xlabel('Frame')
-                plt.ylabel('Drowsy (0/1)')
-                plt.title(f'{instance_id} Drowsiness over time')
-                plt.legend()
+                    ax3.plot(frames, df['expected_is_drowsy'], label='Expected', linestyle='--', alpha=0.9)
+                ax3.set_xlabel('Frame')
+                ax3.set_ylabel('Drowsy (0/1)')
+                ax3.grid(True, alpha=0.3)
+                ax3.legend(loc='upper right')
+
+                plt.tight_layout()
+                plt.savefig(output_path, dpi=150, bbox_inches='tight')
+                plt.close()
             else:
                 # タスクレベル: 期待 vs 実測（バー）
-                expected = int(df.get('expected_is_drowsy', pd.Series([0])).iloc[0]) if 'expected_is_drowsy' in df.columns else 0
-                actual = int(df.get('is_drowsy', pd.Series([0])).iloc[0]) if 'is_drowsy' in df.columns else 0
+                import pandas as _pd  # type: ignore
+                expected = int(df.get('expected_is_drowsy', _pd.Series([0])).iloc[0]) if 'expected_is_drowsy' in df.columns else 0
+                actual = int(df.get('is_drowsy', _pd.Series([0])).iloc[0]) if 'is_drowsy' in df.columns else 0
+                plt.figure(figsize=(6, 4))
                 plt.bar(['Expected', 'Detected'], [expected, actual], color=['gray', 'blue'])
                 plt.ylim(0, 1)
                 plt.title(f'{instance_id} Expected vs Detected')
-
-            plt.tight_layout()
-            plt.savefig(output_path, dpi=150, bbox_inches='tight')
-            plt.close()
+                plt.tight_layout()
+                plt.savefig(output_path, dpi=150, bbox_inches='tight')
+                plt.close()
             return str(output_path)
         except Exception:
             return ""

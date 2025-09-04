@@ -56,17 +56,17 @@ def main():
             result = orchestrator.run_analysis(args.algorithm_output_id)
 
         if result['status'] == 'success':
-            print("✅ 分析が正常に完了しました")
-            print(f"📄 レポート: {result.get('report_path', 'N/A')}")
-            print(f"📊 正解率: {result.get('integrated_results', {}).get('performance_summary', {}).get('accuracy', 'N/A')}")
+            print("[OK] 分析が正常に完了しました")
+            print(f"[REPORT] レポート: {result.get('report_path', 'N/A')}")
+            print(f"[METRIC] 正解率: {result.get('integrated_results', {}).get('performance_summary', {}).get('accuracy', 'N/A')}")
         else:
-            print("❌ 分析に失敗しました")
+            print("[NG] 分析に失敗しました")
             print(f"エラー: {result.get('error', '不明なエラー')}")
 
         return 0 if result['status'] == 'success' else 1
 
     except Exception as e:
-        print(f"❌ 予期しないエラーが発生しました: {str(e)}")
+        print(f"[NG] 予期しないエラーが発生しました: {str(e)}")
         if args.verbose:
             import traceback
             traceback.print_exc()

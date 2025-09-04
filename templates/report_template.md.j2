@@ -1,0 +1,36 @@
+{% set acc = performance_summary.get('accuracy', 'N/A') %}
+# AI分析エンジン 最終レポート
+
+## 実行概要
+- 実行日時: {{ analysis_timestamp }}
+- 分析対象: drowsy_detection アルゴリズム
+
+## 性能分析結果
+- 正解率: {% if acc is number %}{{ '%.1f%%' % (acc * 100) }}{% else %}{{ acc }}{% endif %}
+- 総サンプル数: {{ performance_summary.get('total_samples', 'N/A') }}
+
+{% if performance_summary %}
+### 指標詳細
+{% for k, v in performance_summary.items() %}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif %}
+
+## 個別分析結果概要
+- 分析インスタンス数: {{ instance_summaries | length }}
+
+{% if instance_summaries %}
+### インスタンスサマリ（上位10件）
+{% for s in instance_summaries[:10] %}
+- accuracy={{ '%.1f%%' % (s.get('accuracy', 0) * 100) if s.get('accuracy') is number else s.get('accuracy', 'N/A') }}, anomaly_count={{ s.get('anomaly_count', 0) }}, needs_attention={{ s.get('needs_attention', False) }}
+{% endfor %}
+{% endif %}
+
+{% if recommendations %}
+## 改善提案
+{% for rec in recommendations %}
+{{ loop.index }}. {{ rec }}
+{% endfor %}
+{% endif %}
+
+

@@ -1,0 +1,42 @@
+# 個別データ分析レポート - {{ instance_id }}
+
+## 概要
+- 総フレーム数: {{ total_frames }}
+- 検知された居眠りフレーム数: {{ drowsy_frames }}
+- 期待される居眠りフレーム数: {{ expected_drowsy_frames }}
+- 図表: {{ chart_path or 'N/A' }}
+
+## 仮説分析
+- 仮説: {{ hypothesis_results.get('hypothesis', 'N/A') }}
+- 検証結果: {{ '有効' if hypothesis_results.get('verification', {}).get('valid', False) else '無効' }}
+- 信頼度: {{ '%.1f%%' % (hypothesis_results.get('confidence', 0) * 100) }}
+- 正解率: {{ '%.1f%%' % (hypothesis_results.get('verification', {}).get('accuracy', 0) * 100) }}
+
+## 検知された異常
+{% if anomalies %}
+{% for i, anomaly in enumerate(anomalies, start=1) %}
+### 異常{{ i }}: {{ anomaly['type'] }}
+- 説明: {{ anomaly['description'] }}
+- 件数: {{ anomaly['count'] }}
+- 深刻度: {{ anomaly['severity'] }}
+{% if anomaly.get('frames') %}- 対象フレーム: {{ anomaly['frames'][:5] }}...{% endif %}
+{% endfor %}
+{% else %}
+異常は検知されませんでした。
+{% endif %}
+
+## 推奨事項
+{% if anomalies %}
+- 深刻度の高い異常がある場合は即時対応を推奨します。
+- 過検知が多い場合は閾値の見直しを検討してください。
+- 未検知が多い場合は感度向上を検討してください。
+{% else %}
+- 特筆すべき問題は見つかりませんでした。
+{% endif %}
+
+{% if rag_sources %}
+## 参照した仕様/コード（抜粋）
+{% for s in rag_sources[:8] %}- {{ s }}
+{% endfor %}
+{% endif %}
+

@@ -1,0 +1,27 @@
+2025-09-04 14:19:27,366 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-09-04 14:19:27,366 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-09-04 14:19:27,482 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-09-04 14:19:27,483 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-09-04 14:19:29,935 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.85, 'correct_predictions': 17, 'incorrect_predictions': 3}
+2025-09-04 14:19:29,935 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-09-04 14:19:33,523 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 20 instances analyzed
+2025-09-04 14:19:33,531 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Failed to generate final report: 'enumerate' is undefined
+2025-09-04 14:19:33,531 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Analysis failed: 'enumerate' is undefined
+Traceback (most recent call last):
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 170, in run_analysis_by_evaluation_result
+    report_path = self._generate_final_report(integrated_results)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 298, in _generate_final_report
+    report_content = template.render(
+                     ^^^^^^^^^^^^^^^^
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\.venv\Lib\site-packages\jinja2\environment.py", line 1304, in render
+    self.environment.handle_exception()
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\.venv\Lib\site-packages\jinja2\environment.py", line 939, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "templates\report_template.md.j2", line 31, in top-level template code
+    {% for i, rec in enumerate(recommendations, start=1) %}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\.venv\Lib\site-packages\jinja2\utils.py", line 83, in from_obj
+    if hasattr(obj, "jinja_pass_arg"):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jinja2.exceptions.UndefinedError: 'enumerate' is undefined
