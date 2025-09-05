@@ -8,6 +8,7 @@ import logging
 from typing import Dict, List, Optional, Any
 import pandas as pd
 from pathlib import Path
+import os
 
 from ..config.settings import Settings
 from ..utils.expectation_generator import ExpectationGenerator
@@ -49,6 +50,12 @@ class InstanceAnalyzer:
 
         self.logger.info("InstanceAnalyzer initialized")
         self.rag = RAGSystem(self.settings)
+        # 出力ベースディレクトリ（オーケストレータから設定される想定）
+        self.output_base_dir: Optional[Path] = None
+
+    def set_output_base_dir(self, base_dir: Path) -> None:
+        """オーケストレータから出力ルートを受け取る"""
+        self.output_base_dir = base_dir
 
     def analyze_instances(self, evaluation_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """個別データ分析を実行
@@ -67,6 +74,9 @@ class InstanceAnalyzer:
                 return []
 
             # データの分割（フレーム単位または時間単位でグループ化）
+            # タスクレベル（frame_numが無い）かつ is_correct 列があれば、不正解のみを対象にフィルタ
+            if 'frame_num' not in df.columns and 'is_correct' in df.columns:
+                df = df[df['is_correct'] == 0].reset_index(drop=True)
             instance_groups = self._split_into_instances(df)
 
             results = []
@@ -175,6 +185,13 @@ class InstanceAnalyzer:
             instance_report = self._generate_instance_report(instance_id, df_with_expectations,
                                                           hypothesis_results, anomalies)
 
+            # レポート相対パス（summary.md からの相対）
+            safe_name = instance_id.replace('/', '_')
+            if self.output_base_dir is not None:
+                report_relpath = f"instance_reports/{safe_name}.md"
+            else:
+                report_relpath = str((Path(__file__).parent.parent.parent.parent / "outputs" / "instance_reports" / f"{safe_name}.md").resolve())
+
             result = {
                 'instance_id': instance_id,
                 'status': 'success',
@@ -182,6 +199,7 @@ class InstanceAnalyzer:
                 'hypothesis_results': hypothesis_results,
                 'anomalies': anomalies,
                 'report': instance_report,
+                'report_relpath': report_relpath,
                 'summary': self._generate_instance_summary(df_with_expectations, anomalies)
             }
 
@@ -331,8 +349,18 @@ class InstanceAnalyzer:
         drowsy_frames = int((df['is_drowsy'] == 1).sum()) if 'is_drowsy' in df.columns else 0
         expected_drowsy_frames = int((df['expected_is_drowsy'] == 1).sum()) if 'expected_is_drowsy' in df.columns else 0
 
-        # 図表の生成（タスク/フレーム対応）
+        # 図表と付帯情報の生成
         chart_path = self._create_instance_chart(instance_id, df)
+
+        # タスクレベル（1行）で必要情報がある場合は、サンプル準拠の2種グラフとメタ情報を生成
+        enriched: Dict[str, Any] = {}
+        is_task_level = 'frame_num' not in df.columns and len(df) >= 1
+        if is_task_level and {'start', 'end', 'algorithm_output_dir', 'core_lib_output_dir', 'video_dir'}.issubset(set(df.columns)):
+            try:
+                enriched = self._create_task_charts_and_summary(instance_id, df.iloc[0].to_dict())
+            except Exception as e:
+                self.logger.error(f"Failed to create task-level charts for {instance_id}: {str(e)}")
+                enriched = {}
         # pandasaiで時系列の自然言語要約（可能なら）
         try:
             narrative = self.rag.pandasai_narrative(df)
@@ -356,7 +384,18 @@ class InstanceAnalyzer:
                 chart_path=chart_path,
                 hypothesis_results=hypothesis_results,
                 anomalies=anomalies,
-                rag_sources=getattr(self.rag, 'last_sources', [])
+                rag_sources=getattr(self.rag, 'last_sources', []),
+                # サンプル準拠の追加項目（存在しない場合はNone）
+                conclusion=enriched.get('conclusion'),
+                video_display=enriched.get('video_display'),
+                video_link_path=enriched.get('video_link_path'),
+                frame_range=enriched.get('frame_range'),
+                expected_label=enriched.get('expected_label'),
+                detected_label=enriched.get('detected_label'),
+                algo_chart_path=enriched.get('algo_chart_path'),
+                core_chart_path=enriched.get('core_chart_path'),
+                io_summary=enriched.get('io_summary'),
+                possible_causes=enriched.get('possible_causes'),
             )
         else:
             # フォールバック: 既存のテキスト生成
@@ -410,7 +449,7 @@ class InstanceAnalyzer:
                     report += "- 未検知を減らすため、アルゴリズムの感度向上を検討してください。\n"
 
         # レポートをファイルにも保存（タスク/フレーム両対応）
-        report_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "reports" / "instance_reports"
+        report_dir = (self.output_base_dir / "instance_reports") if self.output_base_dir is not None else (Path(__file__).parent.parent.parent.parent / "outputs" / "instance_reports")
         report_dir.mkdir(parents=True, exist_ok=True)
         safe_name = instance_id.replace('/', '_')
         report_file = report_dir / f"{safe_name}.md"
@@ -423,7 +462,11 @@ class InstanceAnalyzer:
         """個別データの図表を作成して保存し、パスを返す"""
         try:
             import matplotlib.pyplot as plt
-            charts_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "charts" / "instances"
+            # charts出力先: ラン配下/instance_reports/charts
+            if self.output_base_dir is not None:
+                charts_dir = self.output_base_dir / "instance_reports" / "charts"
+            else:
+                charts_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "instance_reports" / "charts"
             charts_dir.mkdir(parents=True, exist_ok=True)
             output_path = charts_dir / f"{instance_id}.png"
 
@@ -479,6 +522,167 @@ class InstanceAnalyzer:
             return str(output_path)
         except Exception:
             return ""
+
+    def _create_task_charts_and_summary(self, instance_id: str, row: Dict[str, Any]) -> Dict[str, Any]:
+        """サンプルに合わせたタスクレベルの2種グラフとメタ情報を生成
+
+        - アルゴリズム出力の該当区間グラフ（is_drowsy, left/right_eye_closed 等があれば）
+        - コア出力の該当区間グラフ（leye_openness, reye_openness, 閾値線）
+        - 結論、動画リンク、フレーム区間、期待/検知ラベル
+        """
+        import matplotlib.pyplot as plt  # type: ignore
+        import pandas as pd  # local alias
+
+        start = int(row.get('start', 0))
+        end = int(row.get('end', -1))
+        algo_dir_rel = row.get('algorithm_output_dir')
+        core_dir_rel = row.get('core_lib_output_dir')
+        video_dir_rel = row.get('video_dir')
+
+        project_root = Path(__file__).parent.parent.parent.parent
+        dwh_root = Path(self.settings.get('global.datawarehouse_path', '../DataWareHouse/'))
+
+        # charts出力先: ラン配下/instance_reports/charts
+        charts_dir = (self.output_base_dir / 'instance_reports' / 'charts') if self.output_base_dir is not None else (project_root / 'outputs' / 'instance_reports' / 'charts')
+        charts_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1) アルゴリズム出力CSVの区間グラフ
+        algo_chart_path = charts_dir / f"{instance_id}_algo.png"
+        try:
+            algo_df = pd.DataFrame()
+            if algo_dir_rel:
+                algo_dir_abs = dwh_root / algo_dir_rel
+                csvs = sorted(list(algo_dir_abs.glob('*.csv')))
+                if csvs:
+                    # 代表CSV（最初）を使用。将来は該当videoに紐付けて選別も可
+                    algo_df = pd.read_csv(csvs[0])
+                    if 'frame' in algo_df.columns and 'frame_num' not in algo_df.columns:
+                        algo_df = algo_df.rename(columns={'frame': 'frame_num'})
+            if not algo_df.empty and 'frame_num' in algo_df.columns:
+                seg = algo_df[(algo_df['frame_num'] >= start) & (algo_df['frame_num'] <= end)].copy()
+                if not seg.empty:
+                    plt.figure(figsize=(10, 4))
+                    frames = seg['frame_num']
+                    if 'is_drowsy' in seg.columns:
+                        plt.plot(frames, seg['is_drowsy'], label='is_drowsy')
+                    if 'left_eye_closed' in seg.columns:
+                        plt.plot(frames, seg['left_eye_closed'].astype(int), label='left_eye_closed')
+                    if 'right_eye_closed' in seg.columns:
+                        plt.plot(frames, seg['right_eye_closed'].astype(int), label='right_eye_closed')
+                    plt.title('アルゴリズム出力（区間）')
+                    plt.xlabel('frame')
+                    plt.legend(loc='upper right')
+                    plt.grid(True, alpha=0.3)
+                    plt.tight_layout()
+                    plt.savefig(algo_chart_path, dpi=150, bbox_inches='tight')
+                    plt.close()
+                else:
+                    algo_chart_path = None
+            else:
+                algo_chart_path = None
+        except Exception:
+            algo_chart_path = None
+
+        # 2) コア出力CSVの区間グラフ（閾値線つき）
+        core_chart_path = charts_dir / f"{instance_id}_core.png"
+        try:
+            core_df = pd.DataFrame()
+            if core_dir_rel:
+                core_dir_abs = dwh_root / core_dir_rel
+                csvs = sorted(list(core_dir_abs.glob('*.csv')))
+                if csvs:
+                    core_df = pd.read_csv(csvs[0])
+                    # 列名合わせ
+                    # 期待: leye_openness, reye_openness（なければ推測）
+                    if 'frame' in core_df.columns and 'frame_num' not in core_df.columns:
+                        core_df = core_df.rename(columns={'frame': 'frame_num'})
+                    # 別表記対応
+                    if 'leye_openness' not in core_df.columns and 'left_eye_open' in core_df.columns:
+                        core_df['leye_openness'] = core_df['left_eye_open']
+                    if 'reye_openness' not in core_df.columns and 'right_eye_open' in core_df.columns:
+                        core_df['reye_openness'] = core_df['right_eye_open']
+            if not core_df.empty and {'frame_num'}.issubset(set(core_df.columns)):
+                seg = core_df[(core_df['frame_num'] >= start) & (core_df['frame_num'] <= end)].copy()
+                if not seg.empty and {'leye_openness', 'reye_openness'}.issubset(set(seg.columns)):
+                    plt.figure(figsize=(10, 4))
+                    frames = seg['frame_num']
+                    plt.plot(frames, seg['leye_openness'], label='leye_openness')
+                    plt.plot(frames, seg['reye_openness'], label='reye_openness')
+                    thr = min(self.expectation_generator.left_eye_threshold, self.expectation_generator.right_eye_threshold)
+                    plt.hlines(thr, xmin=frames.min(), xmax=frames.max(), colors='red', linestyles='--', label='threshold')
+                    plt.title('コア出力（区間）')
+                    plt.xlabel('frame')
+                    plt.legend(loc='upper right')
+                    plt.grid(True, alpha=0.3)
+                    plt.tight_layout()
+                    plt.savefig(core_chart_path, dpi=150, bbox_inches='tight')
+                    plt.close()
+                else:
+                    core_chart_path = None
+            else:
+                core_chart_path = None
+        except Exception:
+            core_chart_path = None
+
+        # 3) 付帯情報の作成
+        expected_label = '連続閉眼あり'  # タスクタグは閉眼タスク想定
+        detected_label = '連続閉眼あり' if int(row.get('is_drowsy', 0)) == 1 else '連続閉眼なし'
+        # 結論: 簡易ロジック（未検知 or 仕様不一致）
+        if detected_label == '連続閉眼なし':
+            conclusion = '被験者が閉眼していない。 or コアの検出機能に問題がある。'
+        else:
+            conclusion = '特筆すべき問題は見られない。'
+
+        # 動画リンク（相対パス表示優先）
+        video_display = None
+        video_link_path = None
+        if video_dir_rel:
+            video_link_path = str(Path('..') / 'ImproveAlgorithmDevelopment' / 'DataWareHouse' / video_dir_rel)
+            video_display = Path(video_link_path).name
+
+        frame_range = f"{start}-{end}"
+
+        # IOサマリと原因（簡易）
+        io_summary = None
+        possible_causes: List[str] = []
+        try:
+            if 'leye_openness' in locals().get('seg', {}).columns and 'reye_openness' in locals().get('seg', {}).columns:  # type: ignore
+                mean_leye = float(seg['leye_openness'].mean())  # type: ignore
+                mean_reye = float(seg['reye_openness'].mean())  # type: ignore
+                approx = (mean_leye + mean_reye) / 2.0
+                trend = '閉眼傾向が見られない' if approx > self.expectation_generator.left_eye_threshold else '閉眼傾向が見られる'
+                io_summary = f"task中のreye_opennessとleye_opennessが{approx:.2f}程度になっており、{trend}。"
+        except Exception:
+            io_summary = None
+
+        if expected_label == '連続閉眼あり' and detected_label == '連続閉眼なし':
+            possible_causes = [
+                '被験者が閉眼していない。',
+                '被験者が正しく閉眼しているが、コアの検出機能に問題がある。'
+            ]
+
+        # 相対パスに変換（レポートからの相対: instance_reports/配下のMDから見て charts/..）
+        def to_relative(p: Optional[Path]) -> Optional[str]:
+            if p is None:
+                return None
+            try:
+                base = (self.output_base_dir / 'instance_reports') if self.output_base_dir is not None else charts_dir.parent
+                return str(Path(os.path.relpath(p, base)))
+            except Exception:
+                return str(p)
+
+        return {
+            'algo_chart_path': to_relative(algo_chart_path if isinstance(algo_chart_path, Path) else Path(str(algo_chart_path)) if algo_chart_path else None),
+            'core_chart_path': to_relative(core_chart_path if isinstance(core_chart_path, Path) else Path(str(core_chart_path)) if core_chart_path else None),
+            'conclusion': conclusion,
+            'video_display': video_display,
+            'video_link_path': video_link_path,
+            'frame_range': frame_range,
+            'expected_label': expected_label,
+            'detected_label': detected_label,
+            'io_summary': io_summary,
+            'possible_causes': possible_causes,
+        }
 
     def _generate_instance_summary(self, df: pd.DataFrame,
                                  anomalies: List[Dict[str, Any]]) -> Dict[str, Any]:

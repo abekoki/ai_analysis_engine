@@ -36,10 +36,21 @@ class Orchestrator:
         self.settings = settings or Settings()
         self.logger = self._setup_logger()
         self.run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # ランごとの出力ベースディレクトリ
+        self.output_base_dir = Path(__file__).parent.parent.parent.parent / 'outputs' / f'analysis_report_{self.run_timestamp}'
+        self.output_base_dir.mkdir(parents=True, exist_ok=True)
 
         # 各エージェントの初期化
         self.performance_analyzer = PerformanceAnalyzer(self.settings)
         self.instance_analyzer = InstanceAnalyzer(self.settings)
+        # 出力先を各アナライザへ伝搬
+        try:
+            if hasattr(self.performance_analyzer, 'set_output_base_dir'):
+                self.performance_analyzer.set_output_base_dir(self.output_base_dir)
+            if hasattr(self.instance_analyzer, 'set_output_base_dir'):
+                self.instance_analyzer.set_output_base_dir(self.output_base_dir)
+        except Exception:
+            pass
 
         # DataWareHouse接続
         db_path = self.settings.get('global.database_path')
@@ -306,10 +317,9 @@ class Orchestrator:
                 report_content = self._generate_simple_report(integrated_results)
 
             # レポート保存
-            report_filename = f"analysis_report_{self.run_timestamp}.md"
-            report_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "reports"
+            report_dir = self.output_base_dir
             report_dir.mkdir(parents=True, exist_ok=True)
-            report_path = report_dir / report_filename
+            report_path = report_dir / 'summary.md'
 
             with open(report_path, 'w', encoding='utf-8') as f:
                 f.write(report_content)
@@ -355,9 +365,9 @@ class Orchestrator:
         return report
 
     def _export_data_artifacts(self, integrated_results: Dict[str, Any]) -> Dict[str, str]:
-        """JSON成果物をoutputs/data配下に出力"""
+        """JSON成果物をランディレクトリ配下のdataに出力"""
         try:
-            data_dir = Path(__file__).parent.parent.parent.parent / "outputs" / "data"
+            data_dir = self.output_base_dir / "data"
             data_dir.mkdir(parents=True, exist_ok=True)
 
             def dump_json(name: str, payload: Any) -> str:
@@ -445,8 +455,8 @@ class Orchestrator:
             except Exception as e:
                 self.logger.error(f"Failed to copy data artifact {p} to DWH: {str(e)}")
 
-        # 3) 図表（outputs/charts配下をまるごと同期）
-        charts_src = Path(__file__).parent.parent.parent.parent / 'outputs' / 'charts'
+        # 3) 図表（ラン配下のchartsを同期）
+        charts_src = self.output_base_dir / 'charts'
         charts_dest = dest_root / 'charts'
         if charts_src.exists():
             try:
@@ -457,7 +467,7 @@ class Orchestrator:
                 self.logger.error(f"Failed to copy charts to DWH: {str(e)}")
 
         # 4) 個別レポート
-        inst_src = Path(__file__).parent.parent.parent.parent / 'outputs' / 'reports' / 'instance_reports'
+        inst_src = self.output_base_dir / 'instance_reports'
         inst_dest = reports_dest / 'instance_reports'
         if inst_src.exists():
             try:

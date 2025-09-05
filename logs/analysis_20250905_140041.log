@@ -1,0 +1,10 @@
+2025-09-05 14:00:41,886 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-09-05 14:00:41,886 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-09-05 14:00:41,922 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-09-05 14:00:41,923 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-09-05 14:00:42,443 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.85, 'correct_predictions': 17, 'incorrect_predictions': 3}
+2025-09-05 14:00:42,443 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-09-05 14:00:42,488 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 20 instances analyzed
+2025-09-05 14:00:42,494 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20250905_140041\summary.md
+2025-09-05 14:00:42,503 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=16
+2025-09-05 14:00:42,503 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

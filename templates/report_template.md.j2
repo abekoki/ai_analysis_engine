@@ -20,6 +20,13 @@
 - 分析インスタンス数: {{ instance_summaries | length }}
 
 {% if instance_summaries %}
+### 個別レポートへのリンク
+{% for s in instance_summaries %}
+{% if s.get('report_relpath') %}- [{{ loop.index }}: 個別レポート]({{ s.get('report_relpath') }}){% endif %}
+{% endfor %}
+{% endif %}
+
+{% if instance_summaries %}
 ### インスタンスサマリ（上位10件）
 {% for s in instance_summaries[:10] %}
 - accuracy={{ '%.1f%%' % (s.get('accuracy', 0) * 100) if s.get('accuracy') is number else s.get('accuracy', 'N/A') }}, anomaly_count={{ s.get('anomaly_count', 0) }}, needs_attention={{ s.get('needs_attention', False) }}
@@ -32,5 +39,9 @@
 {{ loop.index }}. {{ rec }}
 {% endfor %}
 {% endif %}
+
+## 参考リンク
+- 評価結果サマリ（JSON）: data/performance_metrics.json
+- 統合サマリ（JSON）: data/analysis_summary.json
 
 

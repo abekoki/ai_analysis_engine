@@ -1,3 +1,11 @@
+2025-09-05: 個別データ分析レポート生成をサンプル仕様に合わせて更新。
+- `DataWareHouse`タグ単位の行に出力ディレクトリ等を付与（`build_task_level_dataframe`）。
+- タスクレベルのレポートで、アルゴリズム出力とコア出力の区間グラフを自動生成。
+- テンプレートをサンプルのレイアウト（結論/動画リンク/フレーム区間/期待・検知/確認結果）に対応。
+- IOサマリと考えられる原因の自動記述を追加。
+2025-09-05: LLM強制モードを導入（ヒューリスティック解析を無効化）。
+- `config/default_config.yaml` に `instance_analyzer.require_llm: true` を追加。
+- `RAGSystem` を更新し、LLM未利用時は例外を送出。pandasai未導入時はlangchain+ChatOpenAIで要約を実施。
 # AI分析エンジン開発ログ
 
 ## 2025-09-03

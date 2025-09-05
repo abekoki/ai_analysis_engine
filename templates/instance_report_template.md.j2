@@ -1,10 +1,28 @@
 # 個別データ分析レポート - {{ instance_id }}
 
 ## 概要
-- 総フレーム数: {{ total_frames }}
-- 検知された居眠りフレーム数: {{ drowsy_frames }}
-- 期待される居眠りフレーム数: {{ expected_drowsy_frames }}
-- 図表: {{ chart_path or 'N/A' }}
+- 結論 : {{ conclusion or 'N/A' }}
+- 解析対象動画： {% if video_link_path %}[{{ video_display or 'video' }}]({{ video_link_path }}){% else %}N/A{% endif %}
+- フレーム区間: {{ frame_range or 'N/A' }}
+- 期待値：{{ expected_label or 'N/A' }}
+- 検知結果：{{ detected_label or 'N/A' }}
+
+## 確認結果
+{% if algo_chart_path %}![アルゴリズム出力結果のグラフ]({{ algo_chart_path }}){% endif %}
+アルゴリズム出力結果
+<!--今回のケースでは"..\\ImproveAlgorithmDevelopment\\DataWareHouse\\03_algorithm_output\\v0.1.1+fa5172ba\\20250826-155036\\2.csv")の区間における、is_drowsy	, left_eye_closed, right_eye_closedのグラフをpandasaiで生成しリンク-->
+
+{% if core_chart_path %}![コア出力結果のグラフ]({{ core_chart_path }}){% endif %}
+コア出力結果
+<!--該当videoに対応するcsvの区間における、leye_openness, reye_opennessと、仕様書から取得した開眼度閾値をプロットしたグラフをpandasaiで生成しリンク-->
+
+<!--上記のグラフを生成後、閉眼傾向があるかを仮説検証にて確認し、結果をいかに記載-->
+{% if io_summary %}- 入出力の確認結果：{{ io_summary }}{% endif %}
+
+{% if possible_causes %}
+{% for cause in possible_causes %}- 考えられる原因: {{ cause }}
+{% endfor %}
+{% endif %}
 
 ## 仮説分析
 - 仮説: {{ hypothesis_results.get('hypothesis', 'N/A') }}
@@ -14,8 +32,8 @@
 
 ## 検知された異常
 {% if anomalies %}
-{% for i, anomaly in enumerate(anomalies, start=1) %}
-### 異常{{ i }}: {{ anomaly['type'] }}
+{% for anomaly in anomalies %}
+### 異常: {{ anomaly['type'] }}
 - 説明: {{ anomaly['description'] }}
 - 件数: {{ anomaly['count'] }}
 - 深刻度: {{ anomaly['severity'] }}
@@ -34,9 +52,11 @@
 - 特筆すべき問題は見つかりませんでした。
 {% endif %}
 
-{% if rag_sources %}
 ## 参照した仕様/コード（抜粋）
+{% if rag_sources %}
 {% for s in rag_sources[:8] %}- {{ s }}
 {% endfor %}
+{% else %}
+...
 {% endif %}
 

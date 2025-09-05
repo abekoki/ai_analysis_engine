@@ -12,6 +12,11 @@ import json
 
 # DataWareHouseのAPIをインポート
 datawarehouse_path = Path(__file__).parent.parent.parent.parent / "DataWareHouse"
+# プロジェクト直下に無ければ、1つ上の階層（ImproveAlgorithmDevelopment 直下）も探索
+if not datawarehouse_path.exists():
+    alt_path = Path(__file__).parent.parent.parent.parent.parent / "DataWareHouse"
+    if alt_path.exists():
+        datawarehouse_path = alt_path
 if datawarehouse_path.exists() and str(datawarehouse_path) not in sys.path:
     sys.path.insert(0, str(datawarehouse_path))
 
@@ -398,8 +403,44 @@ class DataWareHouseConnector:
         rows = list_evaluation_data(evaluation_result_id, db_path=str(self.db_path))
         tasks: List[Dict[str, Any]] = []
 
-        # キャッシュ: algo_out_id -> concatenated frame df
-        frames_cache: Dict[int, pd.DataFrame] = {}
+        # まず evaluation_data_path のCSVがタスクレベルで expected/is 列を持つ場合はそれを優先
+        try:
+            for r in rows:
+                rel_path = r.get('evaluation_data_path')
+                if not rel_path:
+                    continue
+                p = self.db_path.parent / rel_path
+                if not p.exists():
+                    continue
+                try:
+                    df_eval = pd.read_csv(p)
+                except Exception:
+                    continue
+                # タスクレベルCSVの判断: frame_numが無く、expected/isの列がある
+                if 'frame_num' not in df_eval.columns and {
+                    'expected_is_drowsy', 'is_drowsy'
+                }.issubset(set(df_eval.columns)):
+                    for _, row in df_eval.reset_index(drop=True).iterrows():
+                        task_row = {
+                            'task_id': str(row.get('task_id', f"task_{len(tasks):03d}")),
+                            'video_ID': row.get('video_ID'),
+                            'tag_ID': row.get('tag_ID'),
+                            'task_ID': row.get('task_ID'),
+                            'start': int(row.get('start', 0)) if 'start' in df_eval.columns else None,
+                            'end': int(row.get('end', -1)) if 'end' in df_eval.columns else None,
+                            'expected_is_drowsy': int(row.get('expected_is_drowsy', 1)),
+                            'is_drowsy': int(row.get('is_drowsy', 0)),
+                        }
+                        task_row['is_correct'] = int(task_row['expected_is_drowsy'] == task_row['is_drowsy'])
+                        tasks.append(task_row)
+            if tasks:
+                return pd.DataFrame(tasks)
+        except Exception:
+            # CSV優先の取得に失敗しても、後段のタグ×フレーム法にフォールバック
+            tasks = []
+
+        # キャッシュ: (algo_out_id, video_id) -> frame df（該当動画のCSVのみ採用）
+        frames_cache: Dict[Tuple[int, int], pd.DataFrame] = {}
 
         for r in rows:
             algo_out_id = r.get('algorithm_output_ID')
@@ -411,21 +452,30 @@ class DataWareHouseConnector:
                 core_out = get_core_lib_output(core_out_id, str(self.db_path))
                 video_id = core_out.get('video_ID')
 
-                # フレームCSVを読み込み（結合）
-                if algo_out_id not in frames_cache:
+                # フレームCSVを読み込み（動画ごとに該当CSVを選択）
+                cache_key = (algo_out_id, int(video_id) if video_id is not None else -1)
+                if cache_key not in frames_cache:
                     rel_dir = algo_out.get('algorithm_output_dir')
                     d = self.db_path.parent / rel_dir
-                    dfs: List[pd.DataFrame] = []
+                    selected_df = pd.DataFrame()
                     if d.exists():
-                        for p in sorted(d.glob('*.csv')):
+                        csvs = sorted(d.glob('*.csv'))
+                        target_id = str(video_id)
+                        # 優先1: <video_id>.csv
+                        exact = [p for p in csvs if p.stem == target_id]
+                        # 優先2: <video_id>_*.csv
+                        prefix = [p for p in csvs if p.stem.startswith(target_id + '_')]
+                        # 優先3: ファイル名に _<video_id>_ を含む
+                        contains = [p for p in csvs if f"_{target_id}_" in p.stem]
+                        candidates = exact or prefix or contains or csvs
+                        for p in candidates[:1]:
                             try:
-                                dfp = pd.read_csv(p)
-                                dfs.append(dfp)
+                                selected_df = pd.read_csv(p)
                             except Exception:
-                                continue
-                    frames_cache[algo_out_id] = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+                                selected_df = pd.DataFrame()
+                    frames_cache[cache_key] = selected_df
 
-                frame_df = frames_cache.get(algo_out_id, pd.DataFrame()).copy()
+                frame_df = frames_cache.get(cache_key, pd.DataFrame()).copy()
                 # カラムの正規化
                 if not frame_df.empty and 'frame_num' not in frame_df.columns:
                     if 'frame' in frame_df.columns:
@@ -442,6 +492,10 @@ class DataWareHouseConnector:
                         if not seg.empty:
                             detected = int((seg['is_drowsy'] == 1).any())
 
+                    # 期待値（タグは連続閉眼を期待）
+                    expected = 1
+                    is_correct = int(detected == expected)
+
                     task_row = {
                         'task_id': f"{video_id}_{tg.get('tag_ID')}",
                         'video_ID': video_id,
@@ -449,8 +503,15 @@ class DataWareHouseConnector:
                         'task_ID': tg.get('task_ID'),
                         'start': start,
                         'end': end,
-                        'expected_is_drowsy': 1,
+                        'expected_is_drowsy': expected,
                         'is_drowsy': detected,
+                        'is_correct': is_correct,
+                        # 追加情報: 可視化や詳細レポート作成に使用
+                        'algorithm_output_ID': algo_out_id,
+                        'algorithm_output_dir': algo_out.get('algorithm_output_dir'),
+                        'core_lib_output_ID': core_out_id,
+                        'core_lib_output_dir': core_out.get('core_lib_output_dir'),
+                        'video_dir': core_out.get('video_dir'),
                     }
                     tasks.append(task_row)
             except Exception:

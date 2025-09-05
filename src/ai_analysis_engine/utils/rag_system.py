@@ -76,8 +76,7 @@ class RAGSystem:
 
         可能なら LLM/チェーンを用いるが、フォールバックとしてヒューリスティックを使用。
         """
-        # ヒューリスティック（フォールバック）
-        fallback = self._heuristic_hypothesis(df)
+        require_llm = bool(self.settings.get('instance_analyzer.require_llm', False))
 
         # 参照文脈の収集（_input / docs / src のテキストを軽量に集約）
         try:
@@ -85,9 +84,12 @@ class RAGSystem:
         except Exception:
             retrieved_context = ""
 
-        # LLM が使えない場合は即フォールバック
+        # LLM が使えない場合の挙動
         if not self.langchain_available:
-            return fallback
+            if require_llm:
+                raise RuntimeError("LLMが必須ですが、langchainが利用できません。依存関係とAPIキーを設定してください。")
+            # 許容時のみヒューリスティック
+            return self._heuristic_hypothesis(df)
 
         # ここでは API キーや詳細設定が不明なため、軽量な疑似チェーンのみに留める
         try:
@@ -118,8 +120,10 @@ class RAGSystem:
             out = chain.invoke({"summary": summary, "context": retrieved_context})  # type: ignore
             text = getattr(out, 'content', None) or str(out)
             return text.strip()[:500]
-        except Exception:
-            return fallback
+        except Exception as e:
+            if require_llm:
+                raise RuntimeError(f"LLM呼び出しに失敗しました: {e}")
+            return self._heuristic_hypothesis(df)
 
     def verify_hypothesis(self, hypothesis: str, df) -> Dict[str, Any]:
         """仮説を簡易検証。pandasai があれば自然言語 QA を併用。"""
@@ -128,7 +132,7 @@ class RAGSystem:
         valid = acc < 0.9  # 高精度なら仮説は弱いとみなす
         confidence = 0.6 if 0.7 <= acc < 0.9 else (0.8 if acc < 0.7 else 0.3)
 
-        # pandasai があれば、自然言語の裏付けを取りにいく（失敗しても無視）
+        # pandasai があれば、自然言語の裏付けを取りにいく
         if self.pandasai_available:
             try:
                 from pandasai import SmartDataframe  # type: ignore
@@ -139,7 +143,11 @@ class RAGSystem:
                 _ = sdf.chat("誤検知（expected_is_drowsy=0 かつ is_drowsy=1）の件数を教えてください。")  # noqa: F841
                 # 応答は今回は使わず、成功可否で confidence を微調整
                 confidence = min(0.95, confidence + 0.05)
-            except Exception:
+            except Exception as e:
+                if bool(self.settings.get('instance_analyzer.require_llm', False)):
+                    # LLM必須時は失敗を表層に出す
+                    raise RuntimeError(f"pandasai経由のLLM検証に失敗: {e}")
+                # 任意時は黙って続行
                 pass
 
         return {
@@ -151,7 +159,30 @@ class RAGSystem:
 
     def pandasai_narrative(self, df) -> str:
         """pandasaiで可視化・説明テキストを生成（失敗時は空文字）。"""
+        require_llm = bool(self.settings.get('instance_analyzer.require_llm', False))
         if not self.pandasai_available:
+            if require_llm:
+                # pandasaiが無い場合でも、langchain+ChatOpenAI で短い要約を試みる
+                try:
+                    from langchain.prompts import PromptTemplate  # type: ignore
+                    from langchain_openai import ChatOpenAI  # type: ignore
+                    llm_model = self.settings.get('instance_analyzer.llm_model', 'gpt-4')
+                    temperature = float(self.settings.get('instance_analyzer.temperature', 0.1))
+                    llm = ChatOpenAI(model=llm_model, temperature=temperature, timeout=15)  # type: ignore
+                    prompt = PromptTemplate(
+                        input_variables=["summary"],
+                        template=(
+                            "左/右の開眼度、検知と期待の時系列傾向を日本語で簡潔に説明し、\n"
+                            "過検知/未検知の区間があれば指摘してください。\n"
+                            "[要約]\n{summary}"
+                        ),
+                    )
+                    summary = self._summarize_df(df)
+                    chain = prompt | llm
+                    out = chain.invoke({"summary": summary})  # type: ignore
+                    return (getattr(out, 'content', None) or str(out)).strip()
+                except Exception as e:
+                    raise RuntimeError(f"LLM要約に失敗: {e}")
             return ""
         try:
             from pandasai import SmartDataframe  # type: ignore
