@@ -1,0 +1,48 @@
+{
+  "performance_summary": {
+    "total_samples": 20,
+    "accuracy": 0.45,
+    "correct_predictions": 9,
+    "incorrect_predictions": 11
+  },
+  "instance_summaries": [
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    },
+    {
+      "has_errors": true
+    }
+  ],
+  "recommendations": [
+    "正解率が80%未満です。アルゴリズムの閾値調整を検討してください。",
+    "11件の異常データが検出されました。詳細分析が必要です。"
+  ],
+  "analysis_timestamp": "2025-09-05T14:31:30.995762"
+}

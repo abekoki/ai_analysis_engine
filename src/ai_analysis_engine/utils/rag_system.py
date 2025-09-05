@@ -1,23 +1,30 @@
 """RAG/LLM 支援モジュール
 
-langchain / langgraph / pandasai を可能であれば活用し、未導入環境では安全にフォールバックします。
+langchain / langgraph / pandasai を前提として使用します。
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import os
 
 
 class RAGSystem:
-    """RAG + LLM による仮説生成・検証を支援するクラス。
-
-    - 依存ライブラリが未インストールでも動作可能なフォールバックを提供
-    - APIキー未設定時はヒューリスティックに自動切り替え
-    """
+    """RAG + LLM による仮説生成・検証を支援するクラス（必須ライブラリ前提）。"""
 
     def __init__(self, settings: Any):
         self.settings = settings
-        self._init_optional_libs()
+        # 必須ライブラリの読み込み（失敗時は即時例外）
+        try:
+            import langchain  # noqa: F401
+            import langgraph  # noqa: F401
+            import pandasai  # noqa: F401
+            from langchain_openai import OpenAIEmbeddings  # type: ignore
+            from langchain_community.vectorstores import FAISS  # type: ignore
+            self.OpenAIEmbeddings = OpenAIEmbeddings
+            self.FAISS = FAISS
+        except Exception as e:
+            raise RuntimeError(f"必須ライブラリの読み込みに失敗しました: {e}")
         # 直近の参照ソース（レポートへ表示用）
         self.last_sources: list[str] = []
         # 外部仕様リポジトリの準備（存在しない場合は作成/取得を試行）
@@ -26,50 +33,7 @@ class RAGSystem:
         except Exception:
             pass
 
-    def _init_optional_libs(self) -> None:
-        self.langchain_available = False
-        self.langgraph_available = False
-        self.pandasai_available = False
-
-        # langchain
-        try:
-            import langchain  # noqa: F401
-            self.langchain_available = True
-        except Exception:
-            self.langchain_available = False
-
-        # langgraph
-        try:
-            import langgraph  # noqa: F401
-            self.langgraph_available = True
-        except Exception:
-            self.langgraph_available = False
-
-        # pandasai
-        try:
-            import pandasai  # noqa: F401
-            self.pandasai_available = True
-        except Exception:
-            self.pandasai_available = False
-
-        # ベクトル埋め込み（RAG強化）
-        self.embeddings_available = False
-        try:
-            from langchain_openai import OpenAIEmbeddings  # type: ignore
-            from langchain_community.vectorstores import FAISS  # type: ignore
-            self.OpenAIEmbeddings = OpenAIEmbeddings
-            self.FAISS = FAISS
-            self.embeddings_available = True
-        except Exception:
-            self.OpenAIEmbeddings = None
-            self.FAISS = None
-
-        # git availability (for fetching external specs)
-        try:
-            import subprocess  # noqa: F401
-            self._subprocess_available = True
-        except Exception:
-            self._subprocess_available = False
+    # git availability の事前チェックは行わず、呼び出し側で例外処理
 
     def generate_hypothesis(self, df, context: Optional[Dict[str, Any]] = None) -> str:
         """データと文脈から仮説を生成。
@@ -84,12 +48,7 @@ class RAGSystem:
         except Exception:
             retrieved_context = ""
 
-        # LLM が使えない場合の挙動
-        if not self.langchain_available:
-            if require_llm:
-                raise RuntimeError("LLMが必須ですが、langchainが利用できません。依存関係とAPIキーを設定してください。")
-            # 許容時のみヒューリスティック
-            return self._heuristic_hypothesis(df)
+        # 必須ライブラリ前提のため、以降は常にLLM呼び出しを試みる
 
         # ここでは API キーや詳細設定が不明なため、軽量な疑似チェーンのみに留める
         try:
@@ -98,7 +57,11 @@ class RAGSystem:
 
             llm_model = self.settings.get('instance_analyzer.llm_model', 'gpt-4')
             temperature = float(self.settings.get('instance_analyzer.temperature', 0.1))
-            llm = ChatOpenAI(model=llm_model, temperature=temperature, timeout=15)  # type: ignore
+            api_key = os.environ.get('OPENAI_API_KEY')
+            if not api_key and require_llm:
+                raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません。")
+            # 明示的にAPIキーを渡す（環境変数も併用可能）
+            llm = ChatOpenAI(model=llm_model, temperature=temperature, timeout=15, api_key=api_key)  # type: ignore
 
             prompt = PromptTemplate(
                 input_variables=["summary", "context"],
@@ -121,9 +84,8 @@ class RAGSystem:
             text = getattr(out, 'content', None) or str(out)
             return text.strip()[:500]
         except Exception as e:
-            if require_llm:
-                raise RuntimeError(f"LLM呼び出しに失敗しました: {e}")
-            return self._heuristic_hypothesis(df)
+            # フォールバックは廃止
+            raise RuntimeError(f"LLM呼び出しに失敗しました: {e}")
 
     def verify_hypothesis(self, hypothesis: str, df) -> Dict[str, Any]:
         """仮説を簡易検証。pandasai があれば自然言語 QA を併用。"""
@@ -132,23 +94,23 @@ class RAGSystem:
         valid = acc < 0.9  # 高精度なら仮説は弱いとみなす
         confidence = 0.6 if 0.7 <= acc < 0.9 else (0.8 if acc < 0.7 else 0.3)
 
-        # pandasai があれば、自然言語の裏付けを取りにいく
-        if self.pandasai_available:
-            try:
-                from pandasai import SmartDataframe  # type: ignore
-                from pandasai.llm.openai import OpenAI  # type: ignore
-
-                llm = OpenAI()  # type: ignore
-                sdf = SmartDataframe(df, config={"llm": llm, "enable_cache": True})  # type: ignore
-                _ = sdf.chat("誤検知（expected_is_drowsy=0 かつ is_drowsy=1）の件数を教えてください。")  # noqa: F841
-                # 応答は今回は使わず、成功可否で confidence を微調整
-                confidence = min(0.95, confidence + 0.05)
-            except Exception as e:
-                if bool(self.settings.get('instance_analyzer.require_llm', False)):
-                    # LLM必須時は失敗を表層に出す
-                    raise RuntimeError(f"pandasai経由のLLM検証に失敗: {e}")
-                # 任意時は黙って続行
-                pass
+        # pandasai による自然言語裏付け（必須）
+        try:
+            from pandasai import SmartDataframe  # type: ignore
+            from pandasai.llm.openai import OpenAI  # type: ignore
+            # pandasai用にもAPIキーを明示
+            api_key = os.environ.get('OPENAI_API_KEY')
+            if not api_key and bool(self.settings.get('instance_analyzer.require_llm', False)):
+                raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません（pandasai）。")
+            if api_key:
+                os.environ['OPENAI_API_KEY'] = api_key
+            llm = OpenAI()  # type: ignore
+            sdf = SmartDataframe(df, config={"llm": llm, "enable_cache": True})  # type: ignore
+            _ = sdf.chat("誤検知（expected_is_drowsy=0 かつ is_drowsy=1）の件数を教えてください。")  # noqa: F841
+            confidence = min(0.95, confidence + 0.05)
+        except Exception as e:
+            # 必須として扱うため、失敗は表層化
+            raise RuntimeError(f"pandasai経由のLLM検証に失敗: {e}")
 
         return {
             "valid": bool(valid),
@@ -158,36 +120,16 @@ class RAGSystem:
         }
 
     def pandasai_narrative(self, df) -> str:
-        """pandasaiで可視化・説明テキストを生成（失敗時は空文字）。"""
+        """pandasaiで可視化・説明テキストを生成（必須）。"""
         require_llm = bool(self.settings.get('instance_analyzer.require_llm', False))
-        if not self.pandasai_available:
-            if require_llm:
-                # pandasaiが無い場合でも、langchain+ChatOpenAI で短い要約を試みる
-                try:
-                    from langchain.prompts import PromptTemplate  # type: ignore
-                    from langchain_openai import ChatOpenAI  # type: ignore
-                    llm_model = self.settings.get('instance_analyzer.llm_model', 'gpt-4')
-                    temperature = float(self.settings.get('instance_analyzer.temperature', 0.1))
-                    llm = ChatOpenAI(model=llm_model, temperature=temperature, timeout=15)  # type: ignore
-                    prompt = PromptTemplate(
-                        input_variables=["summary"],
-                        template=(
-                            "左/右の開眼度、検知と期待の時系列傾向を日本語で簡潔に説明し、\n"
-                            "過検知/未検知の区間があれば指摘してください。\n"
-                            "[要約]\n{summary}"
-                        ),
-                    )
-                    summary = self._summarize_df(df)
-                    chain = prompt | llm
-                    out = chain.invoke({"summary": summary})  # type: ignore
-                    return (getattr(out, 'content', None) or str(out)).strip()
-                except Exception as e:
-                    raise RuntimeError(f"LLM要約に失敗: {e}")
-            return ""
         try:
             from pandasai import SmartDataframe  # type: ignore
             from pandasai.llm.openai import OpenAI  # type: ignore
-
+            api_key = os.environ.get('OPENAI_API_KEY')
+            if not api_key and require_llm:
+                raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません（pandasai）。")
+            if api_key:
+                os.environ['OPENAI_API_KEY'] = api_key
             llm = OpenAI()  # type: ignore
             sdf = SmartDataframe(df, config={"llm": llm, "enable_cache": True})  # type: ignore
             prompt = (
@@ -196,8 +138,8 @@ class RAGSystem:
             )
             answer = sdf.chat(prompt)  # type: ignore
             return str(answer)
-        except Exception:
-            return ""
+        except Exception as e:
+            raise RuntimeError(f"pandasaiによる要約生成に失敗: {e}")
 
     # --- helpers ---
     def _heuristic_hypothesis(self, df) -> str:
@@ -235,12 +177,11 @@ class RAGSystem:
 
         ベクタDBは使わず、重要そうなファイルを優先して先頭数千文字のみ読み込む。
         """
-        # ベクトルDB（FAISS）が利用可能なら、簡易インデックスを作成して高相関の断片を抽出
-        if getattr(self, 'embeddings_available', False):
-            try:
-                return self._collect_context_with_vectors(max_chars=max_chars)
-            except Exception:
-                pass
+        # ベクトルDB（FAISS）での収集をまず試みる
+        try:
+            return self._collect_context_with_vectors(max_chars=max_chars)
+        except Exception:
+            pass
         from pathlib import Path
 
         root = Path(__file__).parent.parent.parent.parent
