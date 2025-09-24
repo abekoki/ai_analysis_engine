@@ -1,0 +1,1 @@
+# Commands for Running Project Entrypoints\n\n- Main Analysis: python scripts/run_analysis.py [options]\n  - Options: --algorithm-output-id ID, --config PATH, --verbose\n- CLI: ai-analysis [arguments]\n- From Code: Import and run Orchestrator.run_analysis()

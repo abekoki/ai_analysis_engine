@@ -34,9 +34,10 @@ class Settings:
         """デフォルト設定ファイルを作成"""
         default_config = {
             "global": {
-                "database_path": "../DataWareHouse/database.db",
-                "datawarehouse_path": "../DataWareHouse/",
-                "templates_path": "./templates/"
+                "database_path": "../development_datas/database.db",
+                "datawarehouse_path": "../development_datas/",
+                "templates_path": "./templates/",
+                "external_resources_path": "./external"
             },
             "orchestrator": {
                 "max_parallel_instances": 4,
@@ -56,6 +57,28 @@ class Settings:
                     "right_eye_close_threshold": 0.10,
                     "continuous_close_time": 1.00,
                     "face_conf_threshold": 0.75
+                },
+                "resources": {
+                    "external_root": "./external",
+                    "algorithm": {
+                        "spec_dirs": [
+                            "drowsy_detection/01_algorithm_specification",
+                            "drowsy_detection/02_specific_design"
+                        ],
+                        "code_dirs": [
+                            "drowsy_detection/src/drowsy_detection"
+                        ],
+                        "extra_files": []
+                    },
+                    "evaluation": {
+                        "spec_dirs": [
+                            "drowsy_detection/evaluation_engine"
+                        ],
+                        "code_dirs": [
+                            "drowsy_detection/evaluation_engine"
+                        ],
+                        "extra_files": []
+                    }
                 }
             }
         }

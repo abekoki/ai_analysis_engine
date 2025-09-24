@@ -10,19 +10,17 @@ import argparse
 from pathlib import Path
 from typing import List, Dict
 
-# Add DataWareHouse to path
+# DataWareHouse パッケージは pip インストール済みを前提とする
 PROJECT_ROOT = Path(__file__).parent.parent
-DWH_ROOT = PROJECT_ROOT.parent / "DataWareHouse"
-if DWH_ROOT.exists():
-    sys.path.insert(0, str(DWH_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from datawarehouse.evaluation_api import list_evaluation_data
-from datawarehouse.algorithm_api import get_algorithm_output
-from datawarehouse.core_lib_api import get_core_lib_output
-from datawarehouse.video_api import get_video
-from datawarehouse.tag_api import get_video_tags
+from datawarehouse.evaluation.api import list_evaluation_data
+from datawarehouse.algorithm.api import get_algorithm_output
+from datawarehouse.core_lib.api import get_core_lib_output
+from datawarehouse.tag.api import get_video_tags
 
-DB_PATH = str(DWH_ROOT / "database.db")
+DEFAULT_DB_ROOT = PROJECT_ROOT / ".." / "development_datas"
+DB_PATH = str((DEFAULT_DB_ROOT / "database.db").resolve())
 
 
 def gather_targets(evaluation_result_id: int) -> List[Dict]:

@@ -23,7 +23,6 @@ AI分析エンジンは、アルゴリズムの評価結果を自動分析し、
 - **Python**: 3.10+
 - **主要ライブラリ**:
   - pandas: データ処理
-  - pandasai: AI支援データ分析
   - langchain: LLM統合
   - matplotlib/seaborn/plotly: 可視化
   - jinja2: テンプレートエンジン
@@ -87,8 +86,8 @@ if result['status'] == 'success':
 
 ```yaml
 global:
-  database_path: ../DataWareHouse/database.db
-  datawarehouse_path: ../DataWareHouse/
+  database_path: ../development_datas/database.db
+  datawarehouse_path: ../development_datas/
   templates_path: ./templates/
 
 orchestrator:
@@ -165,8 +164,9 @@ ai_analysis_engine/
 
 ## DataWareHouse連携
 
+- **パッケージ導入**: `uv pip install git+https://github.com/abekoki/DataWareHouse@remake_pip_lib`
 - **データ取得**: `algorithm_output_table`から評価結果を取得
-- **結果保存**: `05_analysis_output/`配下に分析結果を保存
+- **結果保存**: `../development_datas/05_analysis_output/` 配下に分析結果を保存
 - **データベース更新**: 分析結果を適切なテーブルに登録
 
 ## 開発・テスト

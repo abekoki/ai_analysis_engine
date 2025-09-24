@@ -225,8 +225,6 @@ ai_analysis_engine/
 - **環境管理**: uv
 
 ## 依存関係
-- pandasai>=3.0.0b19
-- pandasai-openai>=0.1.6
 - langchain-openai>=1.0.0a1
 - matplotlib>=3.7.5
 - seaborn>=0.12.2
@@ -236,8 +234,8 @@ ai_analysis_engine/
 ## 設定項目
 ```yaml
 global:
-  database_path: ../DataWareHouse/database.db
-  datawarehouse_path: ../DataWareHouse/
+  database_path: ../development_datas/database.db
+  datawarehouse_path: ../development_datas/
   templates_path: ./templates/
 orchestrator:
   max_parallel_instances: 4
@@ -268,7 +266,7 @@ instance_analyzer:
 - **動的期待値生成**: 各フレームの入力データから期待出力を算出
 
 ### 成果物格納仕様
-- **格納先**: `../DataWareHouse/05_analysis_output/`
+- **格納先**: `../development_datas/05_analysis_output/`
 - **データベース登録**: `database.db`の`algorithm_output_table`に登録
 - **ディレクトリ構造**:
   ```

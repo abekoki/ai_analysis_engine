@@ -1,0 +1,1 @@
+# Utility Commands for Windows\n\n- List files: dir\n- Change directory: cd\n- Git commands: git status, git add, git commit, etc. (Git for Windows assumed)\n- Search files: dir /s /b *pattern*\n- Grep equivalent: findstr \"pattern\" file.txt\n- Find files: dir /s /b *filename*\n- Environment activation: .venv\\Scripts\\activate.bat\n- Install dependencies: uv pip install -e .

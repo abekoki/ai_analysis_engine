@@ -1,6 +1,6 @@
-"""RAG/LLM 支援モジュール
+"""RAG/LLM 支援モジュール.
 
-langchain / langgraph / pandasai を前提として使用します。
+langchain / langgraph を前提とし、pandasai 依存は撤廃。
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ class RAGSystem:
         try:
             import langchain  # noqa: F401
             import langgraph  # noqa: F401
-            import pandasai  # noqa: F401
             from langchain_openai import OpenAIEmbeddings  # type: ignore
             from langchain_community.vectorstores import FAISS  # type: ignore
             self.OpenAIEmbeddings = OpenAIEmbeddings
@@ -88,29 +87,10 @@ class RAGSystem:
             raise RuntimeError(f"LLM呼び出しに失敗しました: {e}")
 
     def verify_hypothesis(self, hypothesis: str, df) -> Dict[str, Any]:
-        """仮説を簡易検証。pandasai があれば自然言語 QA を併用。"""
-        # ベースラインの数値検証
+        """仮説を簡易検証（統計的指標のみ）."""
         acc = self._calc_accuracy(df)
-        valid = acc < 0.9  # 高精度なら仮説は弱いとみなす
+        valid = acc < 0.9
         confidence = 0.6 if 0.7 <= acc < 0.9 else (0.8 if acc < 0.7 else 0.3)
-
-        # pandasai による自然言語裏付け（必須）
-        try:
-            from pandasai import SmartDataframe  # type: ignore
-            from pandasai.llm.openai import OpenAI  # type: ignore
-            # pandasai用にもAPIキーを明示
-            api_key = os.environ.get('OPENAI_API_KEY')
-            if not api_key and bool(self.settings.get('instance_analyzer.require_llm', False)):
-                raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません（pandasai）。")
-            if api_key:
-                os.environ['OPENAI_API_KEY'] = api_key
-            llm = OpenAI()  # type: ignore
-            sdf = SmartDataframe(df, config={"llm": llm, "enable_cache": True})  # type: ignore
-            _ = sdf.chat("誤検知（expected_is_drowsy=0 かつ is_drowsy=1）の件数を教えてください。")  # noqa: F841
-            confidence = min(0.95, confidence + 0.05)
-        except Exception as e:
-            # 必須として扱うため、失敗は表層化
-            raise RuntimeError(f"pandasai経由のLLM検証に失敗: {e}")
 
         return {
             "valid": bool(valid),
@@ -118,28 +98,6 @@ class RAGSystem:
             "accuracy": float(acc),
             "reason": f"Accuracy={acc:.3f}"
         }
-
-    def pandasai_narrative(self, df) -> str:
-        """pandasaiで可視化・説明テキストを生成（必須）。"""
-        require_llm = bool(self.settings.get('instance_analyzer.require_llm', False))
-        try:
-            from pandasai import SmartDataframe  # type: ignore
-            from pandasai.llm.openai import OpenAI  # type: ignore
-            api_key = os.environ.get('OPENAI_API_KEY')
-            if not api_key and require_llm:
-                raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません（pandasai）。")
-            if api_key:
-                os.environ['OPENAI_API_KEY'] = api_key
-            llm = OpenAI()  # type: ignore
-            sdf = SmartDataframe(df, config={"llm": llm, "enable_cache": True})  # type: ignore
-            prompt = (
-                "左/右の開眼度、検知(is_drowsy)と期待(expected_is_drowsy)の時系列傾向を日本語で簡潔に説明し、"
-                "過検知/未検知の区間があれば指摘してください。"
-            )
-            answer = sdf.chat(prompt)  # type: ignore
-            return str(answer)
-        except Exception as e:
-            raise RuntimeError(f"pandasaiによる要約生成に失敗: {e}")
 
     # --- helpers ---
     def _heuristic_hypothesis(self, df) -> str:

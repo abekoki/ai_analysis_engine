@@ -4,53 +4,37 @@
 提供します。
 """
 
-import sys
+import json
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
-import pandas as pd
-import json
 
-# DataWareHouseのAPIをインポート
-datawarehouse_path = Path(__file__).parent.parent.parent.parent / "DataWareHouse"
-# プロジェクト直下に無ければ、1つ上の階層（ImproveAlgorithmDevelopment 直下）も探索
-if not datawarehouse_path.exists():
-    alt_path = Path(__file__).parent.parent.parent.parent.parent / "DataWareHouse"
-    if alt_path.exists():
-        datawarehouse_path = alt_path
-if datawarehouse_path.exists() and str(datawarehouse_path) not in sys.path:
-    sys.path.insert(0, str(datawarehouse_path))
+import pandas as pd
 
 try:
-    from datawarehouse.connection import get_connection
-    from datawarehouse.algorithm_api import (
+    from datawarehouse.algorithm.api import (
         get_algorithm_output,
         list_algorithm_outputs,
-        get_latest_algorithm_version
+        get_latest_algorithm_version,
     )
-    from datawarehouse.evaluation_api import (
-        list_evaluation_results,
-        list_evaluation_data,
-        get_evaluation_result,
-    )
-    from datawarehouse.core_lib_api import get_core_lib_output
-    from datawarehouse.tag_api import get_video_tags
-    from datawarehouse.analysis_api import (
+    from datawarehouse.analysis.api import (
+        create_analysis_data,
         create_analysis_result,
+        create_problem,
         get_analysis_result,
         list_analysis_results,
-        create_problem,
-        create_analysis_data
     )
-    from datawarehouse.exceptions import (
-        DWHError,
-        DWHNotFoundError,
-        DWHConstraintError,
-        DWHValidationError
+    from datawarehouse.core_lib.api import get_core_lib_output
+    from datawarehouse.evaluation.api import (
+        get_evaluation_result,
+        list_evaluation_data,
+        list_evaluation_results,
     )
-    DWH_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: DataWareHouse API not available: {e}")
-    DWH_AVAILABLE = False
+    from datawarehouse.tag.api import get_video_tags
+except ImportError as exc:  # pragma: no cover
+    raise ImportError(
+        "DataWareHouse パッケージがインストールされていません。"
+        "uv pip install git+https://github.com/abekoki/DataWareHouse@remake_pip_lib"
+    ) from exc
 
 
 class DataWareHouseConnector:
@@ -62,8 +46,6 @@ class DataWareHouseConnector:
             db_path: データベースファイルのパス
         """
         self.db_path = Path(db_path)
-        if not DWH_AVAILABLE:
-            raise RuntimeError("DataWareHouse APIが利用できません。DataWareHouseが正しくインストールされているか確認してください。")
 
 
 

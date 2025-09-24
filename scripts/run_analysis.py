@@ -8,7 +8,7 @@ import sys
 import argparse
 from pathlib import Path
 
-# プロジェクトルートとDataWareHouseをPythonパスに追加
+# プロジェクトルートをPythonパスに追加
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -16,11 +16,6 @@ sys.path.insert(0, str(project_root))
 src_path = project_root / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
-
-# DataWareHouse APIをパスに追加
-datawarehouse_path = project_root.parent / "DataWareHouse"
-if datawarehouse_path.exists():
-    sys.path.insert(0, str(datawarehouse_path))
 
 from ai_analysis_engine.orchestrator.orchestrator import Orchestrator
 from ai_analysis_engine.config.settings import Settings

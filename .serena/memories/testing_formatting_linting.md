@@ -1,0 +1,1 @@
+# Testing, Formatting, and Linting Commands\n\n- Unit Tests: python -m pytest tests/unit/ -v\n- Integration Tests: python -m pytest tests/integration/ -v\n- Coverage: python -m pytest --cov=src/ai_analysis_engine tests/\n- Formatting: black src/ tests/ scripts/\n- Linting: flake8 src/ tests/ scripts/\n- Type Checking: mypy src/ tests/ scripts/

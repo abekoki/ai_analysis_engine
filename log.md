@@ -1,11 +1,10 @@
-2025-09-05: 個別データ分析レポート生成をサンプル仕様に合わせて更新。
-- `DataWareHouse`タグ単位の行に出力ディレクトリ等を付与（`build_task_level_dataframe`）。
-- タスクレベルのレポートで、アルゴリズム出力とコア出力の区間グラフを自動生成。
-- テンプレートをサンプルのレイアウト（結論/動画リンク/フレーム区間/期待・検知/確認結果）に対応。
-- IOサマリと考えられる原因の自動記述を追加。
-2025-09-05: LLM強制モードを導入（ヒューリスティック解析を無効化）。
-- `config/default_config.yaml` に `instance_analyzer.require_llm: true` を追加。
-- `RAGSystem` を更新し、LLM未利用時は例外を送出。pandasai未導入時はlangchain+ChatOpenAIで要約を実施。
+## 2025-09-24
+- DataWareHouseパッケージ移行・インスタンスアナライザ互換層実装。
+- DataWareHouse: `uv pip install git+https://github.com/abekoki/DataWareHouse@remake_pip_lib` で公式パッケージを導入。
+- 設定: `config/default_config.yaml` の `global.database_path`/`datawarehouse_path` を `../development_datas/` 系に更新し、`external_resources_path` を追加。
+- 互換レイヤー: `src/ai_analysis_engine/instance_analyzer/instance_analyzer.py` を新規実装し、旧 `InstanceAnalyzer` API から `library_api.AIAnalysisEngine` に委譲。RAG初期化用に `external/` 配下の仕様書・コード・評価環境を収集。
+- DataLoader: `src/ai_analysis_engine/utils/data_loader.py` を新パッケージ構造に合わせてリファクタリングし、`DataWareHouseConnector` からローカルリポジトリ依存を排除。
+- ドキュメント: README と `docs/detailed_design_spec.md` の DataWareHouse パス/導入手順を更新。`instance_analyzer.__init__` に互換クラスをエクスポート。
 # AI分析エンジン開発ログ
 
 ## 2025-09-03

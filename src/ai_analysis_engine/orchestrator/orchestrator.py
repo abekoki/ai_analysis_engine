@@ -432,7 +432,7 @@ class Orchestrator:
 
     def _sync_artifacts_to_dwh(self, report_path: Path, data_artifacts: Dict[str, str]) -> None:
         """レポート/図表/JSONをDataWareHouseの05_analysis_output配下に同期する"""
-        dwh_root = Path(self.settings.get('global.datawarehouse_path', '../DataWareHouse/'))
+        dwh_root = Path(self.settings.get('global.datawarehouse_path', '../development_datas/'))
         dest_root = dwh_root / '05_analysis_output' / f'analysis_{self.run_timestamp}'
         dest_root.mkdir(parents=True, exist_ok=True)
 

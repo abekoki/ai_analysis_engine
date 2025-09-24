@@ -1,0 +1,30 @@
+[project]
+name = "ai-analysis-engine"
+version = "1.0.0"
+description = "汎用AI分析エンジンライブラリ"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.1.0",
+    "langchain>=0.2.0",
+    "langchain-openai",
+    "langchain-community",
+    "faiss-cpu",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "openai",
+    "python-dotenv",
+    "tiktoken",
+    "pydantic>=2.0.0",
+    "typing-extensions",
+    "pyyaml>=6.0.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai_analysis_engine*"]
