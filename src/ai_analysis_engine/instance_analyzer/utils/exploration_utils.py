@@ -140,14 +140,49 @@ class ExplorationTool:
             # Call LLM
             response = self.llm.invoke(column_extraction_prompt)
 
-            # Parse JSON response
-            result = json.loads(response.content.strip())
-            if result.get('columns') and len(result['columns']) > 0:
-                columns = result['columns']
-                logger.info(f"LLM extracted columns: {columns[:5]}... (confidence: {result.get('confidence_score', 0.0)})")
-                return columns
-            else:
-                logger.info("No columns found in specification using LLM")
+            # Parse JSON response with better error handling
+            response_text = response.content.strip()
+            if not response_text:
+                logger.warning("LLM returned empty response")
+                return []
+
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                # Extract content between ```json and ```
+                import re
+                json_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(1).strip()
+                else:
+                    # Fallback: remove all ``` markers
+                    response_text = re.sub(r'```\w*\n?', '', response_text).strip()
+
+            try:
+                result = json.loads(response_text)
+                if result.get('columns') and len(result['columns']) > 0:
+                    columns = result['columns']
+                    logger.info(f"LLM extracted columns: {columns[:5]}... (confidence: {result.get('confidence_score', 0.0)})")
+                    return columns
+                else:
+                    logger.info("No columns found in specification using LLM")
+                    return []
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse LLM response as JSON: {e}")
+                logger.info(f"Raw response: {response_text[:200]}...")
+
+                # Try to extract columns using regex as fallback
+                import re
+                column_matches = re.findall(r'"([^"]+)"\s*:\s*"[^"]*"|"([^"]+)"', response_text)
+                extracted_columns = []
+                for match in column_matches:
+                    col = match[0] or match[1]
+                    if col and len(col) > 1 and not col.isdigit():
+                        extracted_columns.append(col)
+
+                if extracted_columns:
+                    logger.info(f"Fallback regex extracted columns: {extracted_columns}")
+                    return extracted_columns
+
                 return []
 
         except Exception as e:
@@ -188,15 +223,51 @@ class ExplorationTool:
             # Call LLM
             response = self.llm.invoke(threshold_extraction_prompt)
 
-            # Parse JSON response
-            result = json.loads(response.content.strip())
-            if result.get('thresholds') and len(result['thresholds']) > 0:
-                thresholds = result['thresholds']
-                logger.info(f"LLM extracted thresholds: {thresholds} (confidence: {result.get('confidence_score', 0.0)})")
-                return thresholds
-            else:
-                logger.info("No thresholds found in specification using LLM")
-                return {{}}
+            # Parse JSON response with better error handling
+            response_text = response.content.strip()
+            if not response_text:
+                logger.warning("LLM returned empty response for thresholds")
+                return {}
+
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                import re
+                json_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group(1).strip()
+                else:
+                    # Fallback: remove all ``` markers
+                    response_text = re.sub(r'```\w*\n?', '', response_text).strip()
+
+            try:
+                result = json.loads(response_text)
+                if result.get('thresholds') and len(result['thresholds']) > 0:
+                    thresholds = result['thresholds']
+                    logger.info(f"LLM extracted thresholds: {list(thresholds.keys())[:3]}... (confidence: {result.get('confidence_score', 0.0)})")
+                    return thresholds
+                else:
+                    logger.info("No thresholds found in specification using LLM")
+                    return {}
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse LLM threshold response as JSON: {e}")
+                logger.info(f"Raw response: {response_text[:200]}...")
+
+                # Try to extract thresholds using regex as fallback
+                import re
+                threshold_matches = re.findall(r'"([^"]+)"\s*:\s*([0-9.]+)', response_text)
+                extracted_thresholds = {}
+                for match in threshold_matches:
+                    key, value = match
+                    try:
+                        extracted_thresholds[key] = float(value)
+                    except ValueError:
+                        continue
+
+                if extracted_thresholds:
+                    logger.info(f"Fallback regex extracted thresholds: {extracted_thresholds}")
+                    return extracted_thresholds
+
+                return {}
 
         except Exception as e:
             raise RuntimeError(f"LLM threshold extraction failed: {e}") from e

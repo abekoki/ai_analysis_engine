@@ -17,6 +17,7 @@ class DatasetInfo(BaseModel):
     evaluation_spec_md: str = Field(..., description="Path to evaluation specification Markdown")
     evaluation_code_files: List[str] = Field(default_factory=list, description="Paths to evaluation environment code files")
     expected_result: str = Field(..., description="Natural language description of expected results")
+    evaluation_interval: Optional[Dict[str, Any]] = Field(default=None, description="Evaluation interval information (start, end, etc.)")
 
     # Processing state
     data_summary: Optional[Dict[str, Any]] = Field(default=None, description="Data summary from DataChecker")

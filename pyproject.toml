@@ -20,10 +20,12 @@ dependencies = [
     "jinja2>=3.1.0",
     "scikit-learn>=1.3.0",
     "plotly>=5.18.0",
-    "langchain>=0.2.0",
-    "langchain-openai>=0.1.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-core>=0.3.0",
     "langgraph>=0.2.0",
-    "faiss-cpu>=1.7.4"
+    "faiss-cpu>=1.7.4",
+    "datawarehouse @ git+https://github.com/abekoki/DataWareHouse@remake_pip_lib"
 ]
 
 [project.optional-dependencies]
@@ -44,6 +46,9 @@ packages = ["src/ai_analysis_engine"]
 
 [project.scripts]
 ai-analysis = "ai_analysis_engine.scripts.run_analysis:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv]
 dev-dependencies = [

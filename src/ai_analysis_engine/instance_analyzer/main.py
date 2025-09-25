@@ -61,6 +61,7 @@ class AIAnalysisEngine:
                               expected_results: List[str],
                               algorithm_codes: Optional[List[List[str]]] = None,
                               evaluation_codes: Optional[List[List[str]]] = None,
+                              evaluation_intervals: Optional[List[Optional[Dict[str, Any]]]] = None,
                               dataset_ids: Optional[List[str]] = None,
                               output_dir: Optional[str] = None) -> AnalysisState:
         """
@@ -94,6 +95,9 @@ class AIAnalysisEngine:
             algo_codes = algorithm_codes[i] if algorithm_codes is not None and i < len(algorithm_codes) else []
             eval_codes = evaluation_codes[i] if evaluation_codes is not None and i < len(evaluation_codes) else []
 
+            # evaluation_intervals から対応する区間情報を取得
+            interval_info = evaluation_intervals[i] if evaluation_intervals and i < len(evaluation_intervals) else None
+
             dataset = DatasetInfo(
                 id=dataset_id,
                 algorithm_output_csv=algo_csv,
@@ -102,7 +106,8 @@ class AIAnalysisEngine:
                 algorithm_code_files=algo_codes,
                 evaluation_spec_md=eval_spec,
                 evaluation_code_files=eval_codes,
-                expected_result=expected
+                expected_result=expected,
+                evaluation_interval=interval_info
             )
 
             datasets.append(dataset)

@@ -11,25 +11,21 @@ from typing import Dict, List, Optional, Tuple, Any
 import pandas as pd
 
 try:
-    from datawarehouse.algorithm.api import (
+    from datawarehouse import (
         get_algorithm_output,
         list_algorithm_outputs,
         get_latest_algorithm_version,
-    )
-    from datawarehouse.analysis.api import (
         create_analysis_data,
         create_analysis_result,
         create_problem,
         get_analysis_result,
         list_analysis_results,
-    )
-    from datawarehouse.core_lib.api import get_core_lib_output
-    from datawarehouse.evaluation.api import (
+        get_core_lib_output,
         get_evaluation_result,
         list_evaluation_data,
         list_evaluation_results,
+        get_video_tags,
     )
-    from datawarehouse.tag.api import get_video_tags
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "DataWareHouse パッケージがインストールされていません。"

@@ -117,9 +117,12 @@ class AIAnalysisEngine:
         self,
         algorithm_outputs: List[str],
         core_outputs: List[str],
-        expected_results: List[str],
+        expected_results: List[int],
         output_dir: str,
         dataset_ids: List[str],
+        algorithm_codes: Optional[List[List[str]]] = None,
+        evaluation_codes: Optional[List[List[str]]] = None,
+        evaluation_intervals: Optional[List[Optional[Dict[str, Any]]]] = None,
         timeout: Optional[int] = None
     ) -> List[AnalysisResult]:
         """
@@ -144,6 +147,12 @@ class AIAnalysisEngine:
         if not self.is_initialized():
             raise InitializationError("Engine not initialized. Call initialize() first.")
 
+        # パラメータで指定された場合はコードファイルを更新
+        if algorithm_codes is not None:
+            self._algorithm_codes = algorithm_codes
+        if evaluation_codes is not None:
+            self._evaluation_codes = evaluation_codes
+
         # 入力検証
         self._validate_analysis_inputs(
             algorithm_outputs, core_outputs, expected_results, output_dir, dataset_ids
@@ -159,7 +168,10 @@ class AIAnalysisEngine:
                 algorithm_outputs, core_outputs, expected_results, dataset_ids
             )):
                 try:
-                    print(f"📊 データセット {i+1}/{len(dataset_ids)} を処理中: {dataset_id}")
+                    print(f"[INFO] データセット {i+1}/{len(dataset_ids)} を処理中: {dataset_id}")
+
+                    # evaluation_intervals から対応する区間情報を取得
+                    interval_info = evaluation_intervals[i] if evaluation_intervals and i < len(evaluation_intervals) else None
 
                     # 内部エンジン用のリクエスト作成
                     state = self._internal_engine.create_analysis_request(
@@ -167,9 +179,10 @@ class AIAnalysisEngine:
                         core_outputs=[core_csv],
                         algorithm_specs=self._algorithm_specs,
                         evaluation_specs=self._evaluation_specs,
-                        expected_results=[expected],
+                        expected_results=[str(expected)],  # 整数を文字列に変換
                         algorithm_codes=self._algorithm_codes,
                         evaluation_codes=self._evaluation_codes,
+                        evaluation_intervals=[interval_info],
                         dataset_ids=[dataset_id],
                         output_dir=output_dir
                     )
@@ -188,10 +201,10 @@ class AIAnalysisEngine:
                     )
                     results.append(analysis_result)
 
-                    print(f"✅ データセット {dataset_id} の分析完了")
+                    print(f"[OK] データセット {dataset_id} の分析完了")
 
                 except Exception as e:
-                    print(f"❌ データセット {dataset_id} の分析失敗: {e}")
+                    print(f"[NG] データセット {dataset_id} の分析失敗: {e}")
                     # エラーが発生しても処理を継続
                     error_result = AnalysisResult.error_result(
                         dataset_id=dataset_id,
@@ -200,7 +213,7 @@ class AIAnalysisEngine:
                     )
                     results.append(error_result)
 
-            print(f"📊 一括分析完了: {len(results)}/{len(dataset_ids)} 件処理")
+            print(f"[OK] 一括分析完了: {len(results)}/{len(dataset_ids)} 件処理")
             return results
 
         except asyncio.TimeoutError:
@@ -232,12 +245,12 @@ class AIAnalysisEngine:
 
             # ベクトルストアの初期化
             if rag_tool.initialize_vector_stores(documents):
-                print("✅ RAGベクトル化完了")
+                print("[OK] RAGベクトル化完了")
             else:
-                print("⚠️ RAGベクトル化で警告が発生しましたが、処理を継続します")
+                print("[WARN] RAGベクトル化で警告が発生しましたが、処理を継続します")
 
         except Exception as e:
-            print(f"⚠️ RAGベクトル化でエラーが発生しましたが、処理を継続します: {e}")
+            print(f"[WARN] RAGベクトル化でエラーが発生しましたが、処理を継続します: {e}")
 
     def _validate_initialization_inputs(
         self,
@@ -279,7 +292,7 @@ class AIAnalysisEngine:
             if not spec_file.lower().endswith(('.md', '.txt', '.markdown')):
                 raise ValidationError(f"Specification file must be .md, .txt, or .markdown: {spec_file}")
 
-        print(f"✅ 初期化入力検証完了: {len(all_files)} ファイル確認済み")
+        print(f"[OK] 初期化入力検証完了: {len(all_files)} ファイル確認済み")
 
     def _validate_analysis_inputs(
         self,
@@ -338,12 +351,12 @@ class AIAnalysisEngine:
             if not dataset_id.strip():
                 raise ValidationError("dataset_ids cannot contain empty strings")
 
-        # 期待結果チェック
+        # 期待結果チェック（整数値のリストとして扱う）
         for expected in expected_results:
-            if not expected.strip():
-                raise ValidationError("expected_results cannot contain empty strings")
+            if not isinstance(expected, int) or expected not in [0, 1]:
+                raise ValidationError(f"expected_results must contain only 0 or 1, got: {expected}")
 
-        print(f"✅ 分析入力検証完了: {len(algorithm_outputs)} 件のデータセットを確認")
+        print(f"[OK] 分析入力検証完了: {len(algorithm_outputs)} 件のデータセットを確認")
 
     async def analyze_async(
         self,

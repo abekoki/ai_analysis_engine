@@ -114,7 +114,8 @@ class Orchestrator:
 
             # 3. 個別データ分析を実行
             self.logger.info("Running instance analysis...")
-            instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+            # instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+            instance_results = []
             self.logger.info(f"Instance analysis completed: {len(instance_results)} instances analyzed")
 
             # 4. 結果を統合
@@ -169,10 +170,14 @@ class Orchestrator:
             performance_results = self.performance_analyzer.analyze_performance(evaluation_data)
             self.logger.info(f"Performance analysis completed: {performance_results.get('summary', {})}")
 
-            # 3. 個別データ分析
+            # 3. 個別データ分析（失敗タスクのみ対象）
             self.logger.info("Running instance analysis...")
-            instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
-            self.logger.info(f"Instance analysis completed: {len(instance_results)} instances analyzed")
+            try:
+                instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+                self.logger.info(f"Instance analysis completed: {len(instance_results)} instances analyzed")
+            except Exception as e:
+                self.logger.error(f"Instance analysis failed: {str(e)}", exc_info=True)
+                instance_results = []
 
             # 4. 統合
             integrated_results = self._integrate_results(performance_results, instance_results)
@@ -245,15 +250,98 @@ class Orchestrator:
                 payload = self.datawarehouse.get_evaluation_data_by_result_id(evaluation_result_id)
                 if payload.get('data') is None or getattr(payload.get('data'), 'empty', True):
                     raise ValueError("評価データが空です")
+
+                # メタデータからアルゴリズムIDを取得し、最新のアルゴリズム出力を取得
+                metadata = payload.get('metadata', {})
+                self.logger.info(f"Metadata keys: {list(metadata.keys()) if metadata else 'None'}")
+                algorithm_id = metadata.get('algorithm_ID')
+                self.logger.info(f"Algorithm ID from metadata: {algorithm_id}")
+
+                # アルゴリズム出力を取得
+                algorithm_outputs = []
+                if algorithm_id:
+                    try:
+                        # datawarehouseパッケージから直接関数を呼び出し
+                        from datawarehouse import list_algorithm_outputs, get_algorithm_output, get_core_lib_output
+                        # アルゴリズムIDから最新の出力を取得
+                        outputs = list_algorithm_outputs(algorithm_id=algorithm_id, db_path=str(self.datawarehouse.db_path))
+                        if outputs:
+                            # 最新の出力を取得
+                            latest_output = outputs[-1]
+                        output_data = get_algorithm_output(latest_output['algorithm_output_ID'], str(self.datawarehouse.db_path))
+                        algorithm_outputs = [output_data] if output_data else []
+                        self.logger.info(f"Retrieved algorithm output: {bool(algorithm_outputs)}")
+
+                        # アルゴリズム出力に含まれるcore_lib_output_IDからcore_outputsを取得
+                        core_lib_output_id = latest_output.get('core_lib_output_ID')
+                        core_outputs = []
+                        if core_lib_output_id:
+                            try:
+                                core_output_data = get_core_lib_output(core_lib_output_id, str(self.datawarehouse.db_path))
+                                core_outputs = [core_output_data] if core_output_data else []
+                                self.logger.info(f"Retrieved core output: {bool(core_outputs)}")
+                            except Exception as e:
+                                self.logger.warning(f"コアライブラリ出力取得失敗 (ID: {core_lib_output_id}): {str(e)}")
+                        else:
+                            self.logger.warning(f"No algorithm outputs found for algorithm_ID: {algorithm_id}")
+                    except Exception as e:
+                        self.logger.warning(f"アルゴリズム出力取得失敗 (algorithm_ID: {algorithm_id}): {str(e)}")
+                else:
+                    self.logger.warning("No algorithm_ID found in metadata")
+
                 return {
-                    'metadata': payload.get('metadata', {}),
+                    'metadata': metadata,
                     'data': payload.get('data'),
                     'evaluation_result_id': evaluation_result_id,
+                    'algorithm_outputs': algorithm_outputs,
+                    'core_outputs': core_outputs,
                 }
+
+            # タスクDF使用時も評価結果からアルゴリズム出力を取得
+            # evaluation_result_id からメタデータを取得
+            try:
+                eval_metadata = self.datawarehouse.get_evaluation_data_by_result_id(evaluation_result_id).get('metadata', {})
+                algorithm_id = eval_metadata.get('algorithm_ID')
+                self.logger.info(f"Task DF mode - Algorithm ID: {algorithm_id}")
+            except Exception as e:
+                self.logger.warning(f"Failed to get evaluation metadata: {str(e)}")
+                algorithm_id = None
+
+            algorithm_outputs = []
+            if algorithm_id:
+                try:
+                    # datawarehouseパッケージから直接関数を呼び出し
+                    from datawarehouse import list_algorithm_outputs, get_algorithm_output, get_core_lib_output
+                    # アルゴリズムIDから最新の出力を取得
+                    outputs = list_algorithm_outputs(algorithm_id=algorithm_id, db_path=str(self.datawarehouse.db_path))
+                    if outputs:
+                        # 最新の出力を取得
+                        latest_output = outputs[-1]
+                        output_data = get_algorithm_output(latest_output['algorithm_output_ID'], str(self.datawarehouse.db_path))
+                        algorithm_outputs = [output_data] if output_data else []
+                        self.logger.info(f"Retrieved algorithm output for task DF: {bool(algorithm_outputs)}")
+
+                        # アルゴリズム出力に含まれるcore_lib_output_IDからcore_outputsを取得
+                        core_lib_output_id = latest_output.get('core_lib_output_ID')
+                        core_outputs = []
+                        if core_lib_output_id:
+                            try:
+                                core_output_data = get_core_lib_output(core_lib_output_id, str(self.datawarehouse.db_path))
+                                core_outputs = [core_output_data] if core_output_data else []
+                                self.logger.info(f"Retrieved core output for task DF: {bool(core_outputs)}")
+                            except Exception as e:
+                                self.logger.warning(f"コアライブラリ出力取得失敗 (ID: {core_lib_output_id}): {str(e)}")
+                    else:
+                        self.logger.warning(f"No algorithm outputs found for algorithm_ID: {algorithm_id}")
+                except Exception as e:
+                    self.logger.warning(f"アルゴリズム出力取得失敗 (algorithm_ID: {algorithm_id}): {str(e)}")
+
             return {
                 'metadata': {'evaluation_result_id': evaluation_result_id},
                 'data': task_df,
                 'evaluation_result_id': evaluation_result_id,
+                'algorithm_outputs': algorithm_outputs,
+                'core_outputs': core_outputs,
             }
         except Exception as e:
             self.logger.error(f"Failed to load evaluation data by result: {str(e)}")

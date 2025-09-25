@@ -23,20 +23,29 @@ logger = get_logger(__name__)
 
 class RAGTool:
     """
-    RAG tool for document retrieval and search
+    RAG tool for document retrieval and search (Singleton pattern)
     """
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RAGTool, cls).__new__(cls)
+        return cls._instance
 
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small",
-            openai_api_key=config.openai.api_key
-        )
-        self.vector_stores: Dict[str, FAISS] = {}
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=config.vectorstore.chunk_size,
-            chunk_overlap=config.vectorstore.chunk_overlap,
-            separators=["\n\n", "\n", ". ", " ", ""]
-        )
+        if not self._initialized:
+            self.embeddings = OpenAIEmbeddings(
+                model="text-embedding-3-small",
+                openai_api_key=config.openai.api_key
+            )
+            self.vector_stores: Dict[str, FAISS] = {}
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=config.vectorstore.chunk_size,
+                chunk_overlap=config.vectorstore.chunk_overlap,
+                separators=["\n\n", "\n", ". ", " ", ""]
+            )
+            RAGTool._initialized = True
 
     def initialize_vector_stores(self, documents: Dict[str, List[str]]) -> bool:
         """

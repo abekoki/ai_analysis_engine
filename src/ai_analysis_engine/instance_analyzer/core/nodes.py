@@ -2,7 +2,7 @@
 LangGraph nodes for the AI Analysis Engine workflow
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from ..models.state import AnalysisState, DatasetInfo
@@ -150,6 +150,7 @@ class DataCheckerNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Check and analyze data for current dataset"""
         logger.info("Data checker processing")
+        logger.info("\n\n\n======\n\n\n")
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -193,11 +194,23 @@ class DataCheckerNode:
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 column_info = {}
 
+            # Extract column mapping from specs using LLM
+            logger.info("Extracting column mapping from specs")
+            try:
+                column_mapping_result = self._extract_columns_from_specs(state)
+                logger.info(f"Column mapping keys: {list(column_mapping_result.keys()) if column_mapping_result else 'None'}")
+            except Exception as e:
+                logger.error(f"Failed to extract column mapping: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                column_mapping_result = {}
+
             # Update dataset state
             current_dataset.data_summary = {
                 "analysis": analysis_results,
                 "plots": plot_paths,
-                "column_info": column_info
+                "column_info": column_info,
+                "column_mapping": column_mapping_result
             }
             current_dataset.status = "data_checked"
 
@@ -209,7 +222,8 @@ class DataCheckerNode:
                 state.analysis_results[current_dataset.id] = {
                     "analysis": analysis_results,
                     "plots": plot_paths,
-                    "column_info": column_info
+                    "column_info": column_info,
+                    "column_mapping": column_mapping_result
                 }
                 logger.info(f"Successfully stored results for dataset {current_dataset.id}")
             except Exception as e:
@@ -344,6 +358,223 @@ plt.tight_layout()
             logger.error(f"Traceback: {traceback.format_exc()}")
             return {}
 
+    def _extract_columns_from_specs(self, state: AnalysisState) -> Dict[str, Any]:
+        from ..utils.text_utils import extract_columns_with_llm, extract_thresholds_with_llm
+
+        dataset = state.get_current_dataset()
+        if not dataset:
+            return {}
+
+        # Use RAG tool to search for column information
+        column_info = self._get_column_info_from_specs(dataset)
+
+        # Extract columns and thresholds using LLM with spec content
+        spec_content = ""
+        if dataset.algorithm_spec_md:
+            with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
+                spec_content += f.read()
+        if dataset.evaluation_spec_md:
+            with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
+                spec_content += f.read()
+
+        # Extract columns using LLM with fallback strategies
+        input_columns = []
+        output_columns = []
+
+        if spec_content:
+            try:
+                # Extract input columns (features)
+                input_query = "このアルゴリズムで使用される入力特徴量や列名を抽出してください。例: confidence, openness, scoreなど"
+                rag_input_results = self.rag_tool.search(input_query, "algorithm_specs", k=3)
+                if rag_input_results:
+                    input_columns = extract_columns_with_llm(" ".join([r['content'] for r in rag_input_results]))
+                else:
+                    input_columns = extract_columns_with_llm(spec_content)
+
+                # If LLM failed, try regex-based extraction
+                if not input_columns:
+                    input_columns = self._extract_columns_with_regex(spec_content, 'input')
+
+            except Exception as e:
+                logger.warning(f"LLM input column extraction failed: {e}")
+                input_columns = self._extract_columns_with_regex(spec_content, 'input')
+
+            try:
+                # Extract output columns (predictions)
+                output_query = "このアルゴリズムの出力列や予測結果の列名を抽出してください。例: is_drowsy, detection_resultなど"
+                rag_output_results = self.rag_tool.search(output_query, "algorithm_specs", k=3)
+                if rag_output_results:
+                    output_columns = extract_columns_with_llm(" ".join([r['content'] for r in rag_output_results]))
+                else:
+                    output_columns = extract_columns_with_llm(spec_content)
+
+                # If LLM failed, try regex-based extraction
+                if not output_columns:
+                    output_columns = self._extract_columns_with_regex(spec_content, 'output')
+
+            except Exception as e:
+                logger.warning(f"LLM output column extraction failed: {e}")
+                output_columns = self._extract_columns_with_regex(spec_content, 'output')
+
+        # Extract thresholds using RAG and LLM
+        thresholds = {}
+        if spec_content:
+            threshold_query = "このアルゴリズムで使用される閾値やしきい値を抽出してください。例: 0.5, 0.8など"
+            try:
+                rag_threshold_results = self.rag_tool.search(threshold_query, "algorithm_specs", k=3)
+                if rag_threshold_results:
+                    thresholds = extract_thresholds_with_llm(" ".join([r['content'] for r in rag_threshold_results]))
+                else:
+                    thresholds = extract_thresholds_with_llm(spec_content)
+            except:
+                thresholds = extract_thresholds_with_llm(spec_content)
+
+        # Map to actual CSV columns using fuzzy matching with multiple strategies
+        available_columns = []
+        if 'algorithm_data' in state and hasattr(state['algorithm_data'], 'columns'):
+            available_columns = list(state['algorithm_data'].columns)
+        elif 'core_data' in state and hasattr(state['core_data'], 'columns'):
+            available_columns = list(state['core_data'].columns)
+
+        # Enhanced column mapping with multiple matching strategies
+        column_mapping = {
+            'input': self._map_columns_to_csv(input_columns, available_columns),
+            'output': self._map_columns_to_csv(output_columns, available_columns),
+            'thresholds': thresholds
+        }
+
+        # Ensure we have at least some columns for plotting
+        if not column_mapping['input'] and not column_mapping['output']:
+            # Fallback: use numeric columns from CSV
+            numeric_columns = [col for col in available_columns if col in ['confidence', 'score', 'openness', 'probability', 'leye_openness', 'reye_openness']]
+            if numeric_columns:
+                column_mapping['input'] = {col: col for col in numeric_columns[:4]}  # Take up to 4 columns
+            else:
+                # Last resort: take first few numeric columns
+                import pandas as pd
+                if 'algorithm_data' in state and hasattr(state['algorithm_data'], 'select_dtypes'):
+                    numeric_cols = state['algorithm_data'].select_dtypes(include=['number']).columns.tolist()
+                    column_mapping['input'] = {col: col for col in numeric_cols[:4]}
+
+        logger.info(f"Extracted column mapping - input: {list(column_mapping['input'].keys())}, output: {list(column_mapping['output'].keys())}, thresholds: {list(thresholds.keys())}")
+
+        # Log final column mappings used for analysis
+        logger.info(f"COLUMN_MAPPING_USED - Input: {column_mapping['input']}")
+        logger.info(f"COLUMN_MAPPING_USED - Output: {column_mapping['output']}")
+        logger.info(f"COLUMN_MAPPING_USED - Thresholds: {thresholds}")
+
+        return {'column_mapping': column_mapping}
+
+    def _map_columns_to_csv(self, spec_columns: List[str], csv_columns: List[str]) -> Dict[str, str]:
+        """Map specification columns to actual CSV columns using multiple strategies"""
+        mapping = {}
+
+        for spec_col in spec_columns:
+            if not spec_col:
+                continue
+
+            # Strategy 1: Exact match
+            if spec_col in csv_columns:
+                mapping[spec_col] = spec_col
+                continue
+
+            # Strategy 2: Fuzzy matching
+            matched = self._fuzzy_match_column(spec_col, csv_columns)
+            if matched:
+                mapping[spec_col] = matched
+                continue
+
+            # Strategy 3: Common variations
+            variations = self._generate_column_variations(spec_col)
+            for variation in variations:
+                if variation in csv_columns:
+                    mapping[spec_col] = variation
+                    break
+
+        return mapping
+
+    def _generate_column_variations(self, column: str) -> List[str]:
+        """Generate common variations of column names"""
+        variations = []
+        base = column.lower()
+
+        # Common prefixes/suffixes for eye tracking data
+        prefixes = ['left_', 'right_', 'leye_', 'reye_', 'face_']
+        suffixes = ['_openness', '_closed', '_confidence', '_score', '_result']
+
+        for prefix in prefixes:
+            if not base.startswith(prefix):
+                variations.append(f"{prefix}{base}")
+
+        for suffix in suffixes:
+            if not base.endswith(suffix):
+                variations.append(f"{base}{suffix}")
+
+        # Special mappings for common columns
+        special_mappings = {
+            'confidence': ['face_confidence', 'leye_confidence', 'reye_confidence'],
+            'openness': ['leye_openness', 'reye_openness'],
+            'score': ['detection_score', 'confidence_score'],
+            'result': ['detection_result', 'is_drowsy']
+        }
+
+        if base in special_mappings:
+            variations.extend(special_mappings[base])
+
+        return list(set(variations))  # Remove duplicates
+
+    def _extract_columns_with_regex(self, spec_content: str, column_type: str) -> List[str]:
+        """Extract columns using regex patterns as fallback"""
+        import re
+        columns = []
+
+        # Common column patterns in specifications
+        if column_type == 'input':
+            # Input feature patterns
+            patterns = [
+                r'入力[:\s]*([^、。\n]+)',  # Japanese input patterns
+                r'特徴量[:\s]*([^、。\n]+)',
+                r'feature[:\s]*([^,.\n]+)',  # English patterns
+                r'column[:\s]*([^,.\n]+)'
+            ]
+            # Common input column names for eye-tracking
+            common_inputs = ['confidence', 'openness', 'leye', 'reye', 'face', 'score', 'probability']
+        else:  # output
+            # Output/result patterns
+            patterns = [
+                r'出力[:\s]*([^、。\n]+)',  # Japanese output patterns
+                r'結果[:\s]*([^、。\n]+)',
+                r'result[:\s]*([^,.\n]+)',  # English patterns
+                r'output[:\s]*([^,.\n]+)'
+            ]
+            # Common output column names
+            common_outputs = ['is_drowsy', 'detection', 'result', 'prediction']
+
+        # Extract using patterns
+        for pattern in patterns:
+            matches = re.findall(pattern, spec_content, re.IGNORECASE)
+            for match in matches:
+                # Clean the match
+                clean_match = re.sub(r'[「」\[\](){}]', '', match.strip())
+                if clean_match and len(clean_match) > 1:
+                    columns.append(clean_match.lower())
+
+        # Add common columns if none found
+        if not columns:
+            columns = common_inputs if column_type == 'input' else common_outputs
+
+        # Remove duplicates and filter
+        columns = list(set(columns))
+        columns = [col for col in columns if len(col) > 1 and not col.isdigit()]
+
+        logger.info(f"Regex extracted {column_type} columns: {columns}")
+        return columns
+
+    def _fuzzy_match_column(self, target: str, available: List[str]) -> Optional[str]:
+        from difflib import get_close_matches
+        matches = get_close_matches(target.lower(), [col.lower() for col in available], n=1, cutoff=0.6)
+        return matches[0] if matches else None
+
 
 class ConsistencyCheckerNode:
     """Node for checking consistency between data and specifications"""
@@ -402,7 +633,7 @@ class ConsistencyCheckerNode:
         return state
 
     def _check_consistency(self, dataframes: Dict[str, Any], expected: str, algorithm_config=None) -> Dict[str, Any]:
-        """Check consistency between data and expectations"""
+        """Check consistency between data and expectations using RAG-derived column information"""
         import re
         import numpy as np
 
@@ -418,8 +649,19 @@ class ConsistencyCheckerNode:
                 "longest_run": 0,
                 "runs": []
             },
-            "input_column_stats": {}
+            "input_column_stats": {},
+            "rag_column_validation": {}  # Add RAG-based validation results
         }
+
+        # Get column mapping from current dataset if available
+        column_mapping = {}
+        if hasattr(self, 'current_dataset') and self.current_dataset and hasattr(self.current_dataset, 'data_summary'):
+            column_mapping = self.current_dataset.data_summary.get('column_mapping', {}).get('column_mapping', {})
+
+        # Validate columns using RAG-derived mapping
+        if column_mapping:
+            results["rag_column_validation"] = self._validate_columns_with_mapping(dataframes, column_mapping)
+            results["checks_performed"].append("RAG column mapping validation")
 
         # Basic file presence checks
         for name, df in dataframes.items():
@@ -431,11 +673,16 @@ class ConsistencyCheckerNode:
         # Parse expected text: frame interval and keyword using LLM
         try:
             frame_range = extract_frame_range_with_llm(expected)
-            if frame_range:
+            if frame_range and len(frame_range) == 2:
                 start_f, end_f = frame_range
-                if start_f > end_f:
-                    start_f, end_f = end_f, start_f
-                results["target_interval"] = {"start": start_f, "end": end_f}
+                if start_f is not None and end_f is not None:
+                    if start_f > end_f:
+                        start_f, end_f = end_f, start_f
+                    results["target_interval"] = {"start": start_f, "end": end_f}
+                else:
+                    logger.warning("Frame range contains None values")
+            else:
+                logger.warning("Frame range extraction returned invalid result")
         except RuntimeError as e:
             logger.warning(f"Frame range extraction failed: {e}")
             # Continue without target interval
@@ -478,7 +725,7 @@ class ConsistencyCheckerNode:
                     algo_df = df.copy()
                 else:
                     core_df = df.copy()
-                if core_df and algo_df:
+                if core_df is not None and algo_df is not None:
                     break
 
         if core_df is not None:
@@ -618,6 +865,81 @@ class ConsistencyCheckerNode:
             results["overall_consistent"] = True
 
         return results
+
+    def _validate_columns_with_mapping(self, dataframes: Dict[str, Any], column_mapping: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate dataframes using RAG-derived column mapping"""
+        validation_results = {
+            "input_columns_found": {},
+            "output_columns_found": {},
+            "threshold_validation": {},
+            "column_coverage": {}
+        }
+
+        # Check input columns
+        if 'input' in column_mapping:
+            for spec_col, actual_col in column_mapping['input'].items():
+                found = False
+                for df_name, df in dataframes.items():
+                    if actual_col in df.columns:
+                        validation_results["input_columns_found"][spec_col] = {
+                            "mapped_to": actual_col,
+                            "dataframe": df_name,
+                            "exists": True
+                        }
+                        found = True
+                        break
+                if not found:
+                    validation_results["input_columns_found"][spec_col] = {
+                        "mapped_to": actual_col,
+                        "exists": False
+                    }
+
+        # Check output columns
+        if 'output' in column_mapping:
+            for spec_col, actual_col in column_mapping['output'].items():
+                found = False
+                for df_name, df in dataframes.items():
+                    if actual_col in df.columns:
+                        validation_results["output_columns_found"][spec_col] = {
+                            "mapped_to": actual_col,
+                            "dataframe": df_name,
+                            "exists": True
+                        }
+                        found = True
+                        break
+                if not found:
+                    validation_results["output_columns_found"][spec_col] = {
+                        "mapped_to": actual_col,
+                        "exists": False
+                    }
+
+        # Validate thresholds if available
+        if 'thresholds' in column_mapping:
+            for threshold_name, threshold_value in column_mapping['thresholds'].items():
+                validation_results["threshold_validation"][threshold_name] = {
+                    "value": threshold_value,
+                    "validated": False
+                }
+                # Try to find columns that might be related to this threshold
+                for df_name, df in dataframes.items():
+                    threshold_related_cols = [col for col in df.columns if threshold_name.lower().replace('_threshold', '') in col.lower()]
+                    if threshold_related_cols:
+                        validation_results["threshold_validation"][threshold_name]["validated"] = True
+                        validation_results["threshold_validation"][threshold_name]["related_columns"] = threshold_related_cols
+
+        # Calculate column coverage
+        total_spec_columns = len(column_mapping.get('input', {})) + len(column_mapping.get('output', {}))
+        found_columns = len([col for col in validation_results["input_columns_found"].values() if col.get("exists")]) + \
+                       len([col for col in validation_results["output_columns_found"].values() if col.get("exists")])
+
+        validation_results["column_coverage"] = {
+            "total_specified": total_spec_columns,
+            "found": found_columns,
+            "coverage_percentage": (found_columns / total_spec_columns * 100) if total_spec_columns > 0 else 0
+        }
+
+        logger.info(f"RAG column validation: {found_columns}/{total_spec_columns} columns found ({validation_results['column_coverage']['coverage_percentage']:.1f}%)")
+        return validation_results
 
 
 class HypothesisGeneratorNode:

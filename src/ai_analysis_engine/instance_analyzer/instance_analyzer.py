@@ -5,11 +5,12 @@ Compatibility adapter for the legacy InstanceAnalyzer API.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..config.settings import Settings
-from ..utils.file_utils import ensure_directory
+from .utils.file_utils import ensure_directory
 from .config.library_config import AnalysisConfig
 from .library_api import AIAnalysisEngine
 
@@ -31,13 +32,157 @@ class InstanceAnalyzer:
 
     def analyze_instances(self, evaluation_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         logger.info("Starting legacy instance analysis via adapter")
+        logger.info(f"evaluation_data keys: {list(evaluation_data.keys()) if evaluation_data else 'None'}")
         self._ensure_engine_initialized()
         output_dir = self._resolve_output_dir()
 
-        algorithm_outputs = evaluation_data.get("algorithm_outputs", [])
-        core_outputs = evaluation_data.get("core_outputs", [])
-        expected_results = evaluation_data.get("expected_results", [])
-        dataset_ids = evaluation_data.get("dataset_ids")
+        algorithm_outputs_data = evaluation_data.get("algorithm_outputs", [])
+        core_outputs_data = evaluation_data.get("core_outputs", [])
+
+        # データオブジェクトからCSVファイルパスを抽出
+        algorithm_outputs = []
+        core_outputs = []
+
+        for algo_data in algorithm_outputs_data:
+            if isinstance(algo_data, dict) and 'algorithm_output_dir' in algo_data:
+                # データベースからの相対パスを絶対パスに変換
+                algo_dir = algo_data['algorithm_output_dir']
+                if not os.path.isabs(algo_dir):
+                    algo_dir = os.path.join(self.settings.get('global.database_path', '').replace('database.db', ''), algo_dir)
+                # ディレクトリ内の全CSVファイルを取得
+                if os.path.exists(algo_dir):
+                    for csv_file in os.listdir(algo_dir):
+                        if csv_file.endswith('.csv'):
+                            algorithm_outputs.append(os.path.join(algo_dir, csv_file))
+
+        for core_data in core_outputs_data:
+            if isinstance(core_data, dict) and 'core_lib_output_dir' in core_data:
+                # データベースからの相対パスを絶対パスに変換
+                core_dir = core_data['core_lib_output_dir']
+                logger.info(f"Original core_dir: {core_dir}")
+                if not os.path.isabs(core_dir):
+                    # '../DataWareHouse/...' のようなパスは '../development_datas/...' に置換
+                    if core_dir.startswith('../DataWareHouse/'):
+                        core_dir = '../development_datas/' + core_dir[len('../DataWareHouse/'):]
+                        logger.info(f"Replaced core_dir: {core_dir}")
+                    else:
+                        # その他の相対パスの場合はデータベースディレクトリからの相対として扱う
+                        db_dir = os.path.dirname(self.settings.get('global.database_path', ''))
+                        core_dir = os.path.join(db_dir, core_dir.lstrip('../'))
+                    logger.info(f"Final core_dir: {core_dir}")
+                # ディレクトリ内の全CSVファイルを取得
+                if os.path.exists(core_dir):
+                    logger.info(f"Core dir exists, contents: {os.listdir(core_dir)}")
+                    for csv_file in os.listdir(core_dir):
+                        if csv_file.endswith('.csv'):
+                            core_outputs.append(os.path.join(core_dir, csv_file))
+                else:
+                    logger.warning(f"Core dir does not exist: {core_dir}")
+
+        # expected_results は評価データ（DataFrame）から取得
+        eval_df = evaluation_data.get("data")
+        logger.info(f"eval_df type: {type(eval_df)}, is None: {eval_df is None}")
+        if eval_df is not None:
+            logger.info(f"eval_df columns: {list(eval_df.columns) if hasattr(eval_df, 'columns') else 'no columns'}")
+            logger.info(f"eval_df shape: {eval_df.shape if hasattr(eval_df, 'shape') else 'no shape'}")
+
+        # expected_results の初期化
+        expected_results = []
+        evaluation_intervals = []
+
+        if eval_df is not None and hasattr(eval_df, 'expected_is_drowsy'):
+            logger.info("Processing expected_is_drowsy column")
+            # 失敗タスクのみをフィルタリング（is_correctが0のもの）
+            if 'is_correct' in eval_df.columns:
+                logger.info(f"is_correct values: {eval_df['is_correct'].value_counts().to_dict() if hasattr(eval_df['is_correct'], 'value_counts') else 'no value_counts'}")
+                failed_tasks_df = eval_df[eval_df['is_correct'] == 0].copy()
+                logger.info(f"Filtering to failed tasks only: {len(failed_tasks_df)} failed tasks out of {len(eval_df)} total tasks")
+                eval_df = failed_tasks_df
+            else:
+                logger.warning("is_correct column not found, processing all tasks")
+        else:
+            logger.warning("eval_df is None or does not have expected_is_drowsy column")
+
+        if eval_df is not None and len(eval_df) > 0:
+            for _, row in eval_df.iterrows():
+                expected = int(row['expected_is_drowsy'])  # intに変換
+                expected_results.append(expected)
+
+                # 評価区間情報を別途収集
+                start = row.get('start', None)
+                end = row.get('end', None)
+                interval_info = {
+                    'start': start,
+                    'end': end,
+                    'task_id': row.get('task_id'),
+                    'video_ID': row.get('video_ID'),
+                    'tag_ID': row.get('tag_ID')
+                } if start is not None or end is not None else None
+                evaluation_intervals.append(interval_info)
+        else:
+            expected_results = []
+        # dataset_ids を失敗タスクに基づいて生成
+        if eval_df is not None and len(expected_results) > 0:
+            # 失敗タスクのタスクIDを使用
+            if 'task_id' in eval_df.columns:
+                dataset_ids = eval_df['task_id'].tolist()
+            else:
+                dataset_ids = [f"failed_task_{i + 1}" for i in range(len(expected_results))]
+        else:
+            dataset_ids = evaluation_data.get("dataset_ids")
+
+        # 各リストの長さをexpected_resultsに合わせる
+        num_samples = len(expected_results)
+        logger.info(f"Before expansion - algorithm_outputs: {len(algorithm_outputs)}, core_outputs: {len(core_outputs)}, expected_results: {num_samples}")
+        if algorithm_outputs and num_samples > len(algorithm_outputs):
+            # algorithm_outputsを拡張（同じ要素を繰り返す）
+            algorithm_outputs = algorithm_outputs * ((num_samples // len(algorithm_outputs)) + 1)
+            algorithm_outputs = algorithm_outputs[:num_samples]
+        if core_outputs and num_samples > len(core_outputs):
+            # core_outputsを拡張（同じ要素を繰り返す）
+            core_outputs = core_outputs * ((num_samples // len(core_outputs)) + 1)
+            core_outputs = core_outputs[:num_samples]
+        logger.info(f"After expansion - algorithm_outputs: {len(algorithm_outputs)}, core_outputs: {len(core_outputs)}, expected_results: {num_samples}")
+
+        # DatasetInfoに必要な形式にデータを準備
+        # algorithm_codes と evaluation_codes は設定から取得
+        algorithm_codes = []
+        evaluation_codes = []
+
+        # 設定からコードファイルを取得
+        algo_resources = self.settings.get('instance_analyzer', {}).get('resources', {}).get('algorithm', {})
+        eval_resources = self.settings.get('instance_analyzer', {}).get('resources', {}).get('evaluation', {})
+
+        # アルゴリズムコードファイルを取得
+        for code_dir in algo_resources.get('code_dirs', []):
+            code_path = os.path.join(self.settings.get('global.external_resources_path', ''), code_dir)
+            if os.path.exists(code_path):
+                for root, dirs, files in os.walk(code_path):
+                    for file in files:
+                        if file.endswith('.py'):
+                            algorithm_codes.append(os.path.join(root, file))
+
+        # 評価コードファイルを取得
+        for code_dir in eval_resources.get('code_dirs', []):
+            code_path = os.path.join(self.settings.get('global.external_resources_path', ''), code_dir)
+            if os.path.exists(code_path):
+                for root, dirs, files in os.walk(code_path):
+                    for file in files:
+                        if file.endswith('.py'):
+                            evaluation_codes.append(os.path.join(root, file))
+
+        # algorithm_codes と evaluation_codes を拡張（各要素をリストに変換）
+        if algorithm_codes:
+            # 各データセットに対して同じコードファイルリストを使用
+            algorithm_codes_list = [algorithm_codes[:] for _ in range(num_samples)]  # リストのコピーを作成
+        else:
+            algorithm_codes_list = [[] for _ in range(num_samples)]
+
+        if evaluation_codes:
+            # 各データセットに対して同じコードファイルリストを使用
+            evaluation_codes_list = [evaluation_codes[:] for _ in range(num_samples)]  # リストのコピーを作成
+        else:
+            evaluation_codes_list = [[] for _ in range(num_samples)]
 
         if not algorithm_outputs:
             raise ValueError("evaluation_data.algorithm_outputs is required and cannot be empty")
@@ -66,6 +211,9 @@ class InstanceAnalyzer:
             expected_results=expected_results,
             output_dir=str(output_dir),
             dataset_ids=dataset_ids_resolved,
+            algorithm_codes=algorithm_codes_list,
+            evaluation_codes=evaluation_codes_list,
+            evaluation_intervals=evaluation_intervals,
         )
 
         return [result.model_dump() for result in results]
