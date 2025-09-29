@@ -184,8 +184,10 @@ class AIAnalysisEngine:
                         evaluation_codes=self._evaluation_codes,
                         evaluation_intervals=[interval_info],
                         dataset_ids=[dataset_id],
-                        output_dir=output_dir
+                        output_dir=output_dir,
                     )
+                    if hasattr(state, "datasets") and state.datasets:
+                        state.datasets[0].evaluation_interval = interval_info
 
                     # 分析実行（タイムアウト付き）
                     start_time = time.time()
@@ -493,10 +495,10 @@ class AIAnalysisEngine:
 
         # 仮説の抽出
         hypotheses = []
+        raw_snapshot = internal_result
         if "datasets" in internal_result and internal_result["datasets"]:
             dataset = internal_result["datasets"][0]
 
-            # 仮説の抽出（内部形式から変換）
             if hasattr(dataset, 'hypotheses') and dataset.hypotheses:
                 for hyp in dataset.hypotheses:
                     if isinstance(hyp, dict):
@@ -516,6 +518,10 @@ class AIAnalysisEngine:
                 report = dataset.report_content
                 # レポートファイルパスの推定
                 report_path = f"{self.config.output_dir}/results/reports/{dataset_id}_report.md"
+            if hasattr(dataset, 'model_dump'):
+                raw_snapshot = dataset.model_dump()
+            elif isinstance(dataset, dict):
+                raw_snapshot = dataset
 
         # プロットの取得
         plots = []
@@ -540,5 +546,6 @@ class AIAnalysisEngine:
             plots=plots,
             metrics=metrics,
             report_path=report_path,
-            summary=f"Analysis completed for {dataset_id}"
+            summary=f"Analysis completed for {dataset_id}",
+            raw_data=raw_snapshot,
         )

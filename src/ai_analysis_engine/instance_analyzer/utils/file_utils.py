@@ -2,10 +2,13 @@
 File operation utilities
 """
 
-import pandas as pd
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+import base64
 import json
+import re
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+import pandas as pd
 
 from .logger import get_logger
 from .exploration_utils import extract_json_with_llm
@@ -198,3 +201,133 @@ def get_file_info(file_path: str) -> Dict[str, Any]:
         'is_file': path.is_file(),
         'is_dir': path.is_dir()
     }
+
+
+def ensure_analysis_output_structure(base_dir: Path) -> Dict[str, Path]:
+    """Ensure standard directory structure for analysis outputs exists.
+
+    Args:
+        base_dir: Base directory for the current analysis run
+
+    Returns:
+        Dictionary with resolved paths for key sub-directories
+    """
+
+    base_path = Path(base_dir)
+    results_dir = base_path / "results"
+    reports_dir = results_dir / "reports"
+    images_dir = base_path / "images"
+    logs_dir = base_path / "logs"
+    langgraph_dir = logs_dir / "langgraph_context"
+
+    for path in (results_dir, reports_dir, images_dir, logs_dir, langgraph_dir):
+        path.mkdir(parents=True, exist_ok=True)
+
+    return {
+        "base": base_path,
+        "results": results_dir,
+        "reports": reports_dir,
+        "images": images_dir,
+        "logs": logs_dir,
+        "langgraph": langgraph_dir,
+    }
+
+
+def get_dataset_output_dirs(base_dir: Path, dataset_id: str) -> Dict[str, Path]:
+    """Return dataset-specific output directories, creating them if necessary."""
+
+    structure = ensure_analysis_output_structure(base_dir)
+    dataset_images = structure["images"] / dataset_id
+    dataset_reports = structure["reports"]
+    dataset_images.mkdir(parents=True, exist_ok=True)
+    return {
+        "images": dataset_images,
+        "reports": dataset_reports,
+    }
+
+
+def filter_dataframe_by_interval(df: pd.DataFrame, interval: Optional[Dict[str, Any]]) -> pd.DataFrame:
+    """Filter dataframe rows to the specified start/end interval if possible."""
+
+    if df is None or df.empty or not interval:
+        return df
+
+    start = interval.get("start") or interval.get("start_frame")
+    end = interval.get("end") or interval.get("end_frame")
+    if start is None or end is None:
+        return df
+
+    filtered = df.copy()
+    column_candidates: Iterable[str] = ("frame", "frame_num", "timestamp", "time")
+
+    for column in column_candidates:
+        if column not in filtered.columns:
+            continue
+
+        series = filtered[column]
+        if pd.api.types.is_datetime64_any_dtype(series):
+            start_val = pd.to_datetime(start, errors="coerce")
+            end_val = pd.to_datetime(end, errors="coerce")
+        else:
+            start_val = start
+            end_val = end
+
+        mask = (series >= start_val) & (series <= end_val)
+        filtered = filtered.loc[mask]
+        break
+
+    return filtered.reset_index(drop=True)
+
+
+def compute_representative_stats(
+    df: pd.DataFrame,
+    columns: Optional[Iterable[str]] = None,
+    precision: int = 3,
+) -> Dict[str, Dict[str, float]]:
+    """Compute representative statistics (mean/median/min/max) for specified columns."""
+
+    if df is None or df.empty:
+        return {}
+
+    if columns is None:
+        columns = df.select_dtypes(include=["number", "float", "int"]).columns
+
+    stats: Dict[str, Dict[str, float]] = {}
+    for column in columns:
+        if column not in df.columns:
+            continue
+
+        series = pd.to_numeric(df[column], errors="coerce")
+        series = series.dropna()
+        if series.empty:
+            continue
+
+        stats[column] = {
+            "mean": round(float(series.mean()), precision),
+            "median": round(float(series.median()), precision),
+            "min": round(float(series.min()), precision),
+            "max": round(float(series.max()), precision),
+        }
+
+    return stats
+
+
+def encode_file_to_base64(path: Path, max_bytes: int = 512_000) -> Optional[str]:
+    """Encode a binary file to Base64 string with optional size guard."""
+
+    file_path = Path(path)
+    if not file_path.exists() or not file_path.is_file():
+        return None
+
+    if file_path.stat().st_size > max_bytes:
+        logger.warning(
+            "File too large for base64 encoding (size=%s bytes, limit=%s): %s",
+            file_path.stat().st_size,
+            max_bytes,
+            file_path,
+        )
+        return None
+
+    with open(file_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+    return encoded

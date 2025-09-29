@@ -14,6 +14,7 @@ from ..config.settings import Settings
 from ..performance_analyzer.performance_analyzer import PerformanceAnalyzer
 from ..instance_analyzer.instance_analyzer import InstanceAnalyzer
 from ..utils.data_loader import DataWareHouseConnector
+from ..instance_analyzer.utils.file_utils import ensure_analysis_output_structure
 import shutil
 
 try:
@@ -38,7 +39,7 @@ class Orchestrator:
         self.run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         # ランごとの出力ベースディレクトリ
         self.output_base_dir = Path(__file__).parent.parent.parent.parent / 'outputs' / f'analysis_report_{self.run_timestamp}'
-        self.output_base_dir.mkdir(parents=True, exist_ok=True)
+        ensure_analysis_output_structure(self.output_base_dir)
 
         # 各エージェントの初期化
         self.performance_analyzer = PerformanceAnalyzer(self.settings)
@@ -114,12 +115,25 @@ class Orchestrator:
 
             # 3. 個別データ分析を実行
             self.logger.info("Running instance analysis...")
-            # instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
-            instance_results = []
-            self.logger.info(f"Instance analysis completed: {len(instance_results)} instances analyzed")
+            instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+            enriched_results = []
+            raw_datasets = []
+            for res in instance_results:
+                if hasattr(res, "model_dump"):
+                    data = res.model_dump()
+                else:
+                    data = res
+                if isinstance(data, dict):
+                    raw = data.get("raw_data")
+                    if raw:
+                        raw_datasets.append(raw)
+                enriched_results.append(data)
+            self.logger.info(f"Instance analysis completed: {len(enriched_results)} instances analyzed")
 
             # 4. 結果を統合
-            integrated_results = self._integrate_results(performance_results, instance_results)
+            integrated_results = self._integrate_results(performance_results, enriched_results)
+            if raw_datasets:
+                integrated_results['instance_datasets'] = raw_datasets
 
             # 5. 最終レポートを生成（Jinja2対応）
             report_path = self._generate_final_report(integrated_results)
@@ -352,7 +366,7 @@ class Orchestrator:
         """結果を統合"""
         integrated = {
             'performance_summary': performance_results.get('summary', {}),
-            'instance_summaries': [result.get('summary', {}) for result in instance_results],
+            'instance_summaries': [result.get('summary', {}) for result in instance_results if isinstance(result, dict)],
             'recommendations': self._generate_recommendations(performance_results, instance_results),
             'analysis_timestamp': datetime.now().isoformat()
         }
@@ -368,15 +382,13 @@ class Orchestrator:
         perf_summary = performance_results.get('summary', {})
         accuracy = perf_summary.get('accuracy', 0)
 
-        if accuracy < 0.8:
+        if isinstance(accuracy, (int, float)) and accuracy < 0.8:
             recommendations.append("正解率が80%未満です。アルゴリズムの閾値調整を検討してください。")
-        elif accuracy < 0.9:
+        elif isinstance(accuracy, (int, float)) and accuracy < 0.9:
             recommendations.append("正解率が90%未満です。さらに精度向上の余地があります。")
 
         # 個別分析結果に基づく提案
-        error_instances = [result for result in instance_results
-                          if result.get('summary', {}).get('has_errors', False)]
-
+        error_instances = [res for res in instance_results if isinstance(res, dict) and res.get('summary', {}).get('has_errors')]
         if error_instances:
             recommendations.append(f"{len(error_instances)}件の異常データが検出されました。詳細分析が必要です。")
 

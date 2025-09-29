@@ -11,6 +11,7 @@ from .config import config
 from .models.state import AnalysisState, DatasetInfo
 from .core.graph import AnalysisGraph
 from .utils.logger import get_logger, setup_logging
+from .utils.file_utils import ensure_analysis_output_structure, write_file
 
 logger = get_logger(__name__)
 
@@ -178,11 +179,9 @@ class AIAnalysisEngine:
 
     def _save_results(self, results: Dict[str, Any], custom_output_dir: Optional[str] = None) -> None:
         """Save analysis results to files"""
-        if custom_output_dir:
-            output_dir = Path(custom_output_dir) / "results"
-        else:
-            output_dir = config.output_dir / "results"
-        output_dir.mkdir(exist_ok=True, parents=True)
+        base_dir = Path(custom_output_dir) if custom_output_dir else Path(config.output_dir)
+        structure = ensure_analysis_output_structure(base_dir)
+        output_dir = structure["results"]
 
         # Save individual reports first (independent of JSON saving)
         try:
@@ -193,16 +192,16 @@ class AIAnalysisEngine:
                 for dataset in results["datasets"]:
                     if hasattr(dataset, 'report_content') and dataset.report_content and hasattr(dataset, 'id'):
                         report_file = reports_dir / f"{dataset.id}_report.md"
-                        with open(report_file, 'w', encoding='utf-8') as f:
-                            f.write(dataset.report_content)
+                        write_file(str(report_file), dataset.report_content)
                         self.logger.info(f"Report saved: {report_file}")
         except Exception as e:
             self.logger.error(f"Failed to save reports: {e}")
 
         # Save main results (JSON) - with enhanced error handling
         try:
-            # Convert results to JSON serializable format
             serializable_results = self._make_serializable(results)
+            if "langgraph_memory" in results:
+                serializable_results["langgraph_memory"] = results["langgraph_memory"]
 
             # Additional check for any remaining non-serializable objects
             def check_serializable(obj, path="root"):
@@ -217,11 +216,6 @@ class AIAnalysisEngine:
                         json.dumps(obj)
                     except (TypeError, ValueError) as e:
                         self.logger.warning(f"Non-serializable object at {path}: {type(obj)} - {e}")
-                        # Replace with string representation
-                        if isinstance(obj, dict) and path != "root":
-                            parent_path = ".".join(path.split(".")[:-1])
-                            key = path.split(".")[-1]
-                            # This is a simplified replacement - in practice, we'd need to traverse up the tree
 
             check_serializable(serializable_results)
 
@@ -234,7 +228,6 @@ class AIAnalysisEngine:
 
         except Exception as e:
             self.logger.error(f"Failed to save JSON results: {e}")
-            # Save a minimal error report
             try:
                 error_file = output_dir / "error_summary.json"
                 error_summary = {

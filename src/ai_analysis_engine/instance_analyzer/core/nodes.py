@@ -2,7 +2,7 @@
 LangGraph nodes for the AI Analysis Engine workflow
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Iterable, List, Optional
 from datetime import datetime
 
 from ..models.state import AnalysisState, DatasetInfo
@@ -12,6 +12,11 @@ from ..tools.repl_tool import REPLTool
 from ..utils.logger import get_logger
 from ..utils.exploration_utils import extract_frame_range_with_llm
 from ..config import config
+from ..utils.file_utils import (
+    compute_representative_stats,
+    filter_dataframe_by_interval,
+    get_dataset_output_dirs,
+)
 
 logger = get_logger(__name__)
 
@@ -166,12 +171,24 @@ class DataCheckerNode:
             dataframes = self.repl_tool.load_csv_data(csv_files)
             logger.info(f"Loaded {len(dataframes)} dataframes: {list(dataframes.keys())}")
 
+            interval = {}
+            if isinstance(current_dataset.data_summary, dict):
+                interval = current_dataset.data_summary.get("evaluation_interval", {})
+
+            filtered_dataframes: Dict[str, Any] = {}
+            for name, df in dataframes.items():
+                filtered_df = filter_dataframe_by_interval(df, interval)
+                filtered_dataframes[name] = filtered_df if filtered_df is not None else df
+
             # Analyze data
             analysis_results = {}
-            for name, df in dataframes.items():
+            representative_stats: Dict[str, Dict[str, Dict[str, float]]] = {}
+            for name, df in filtered_dataframes.items():
                 try:
                     logger.info(f"Analyzing dataframe {name} with shape {df.shape}")
                     analysis_results[name] = self.repl_tool.analyze_dataframe(df, name)
+                    representative_stats[name] = compute_representative_stats(df)
+                    logger.info(f"Computed representative stats for {name}: {list(representative_stats[name].keys())}")
                 except Exception as e:
                     logger.error(f"Failed to analyze dataframe {name}: {e}")
                     import traceback
@@ -180,7 +197,7 @@ class DataCheckerNode:
 
             # Create plots
             logger.info("Creating data plots")
-            plot_paths = self._create_data_plots(dataframes, current_dataset.id, state)
+            plot_paths = self._create_data_plots(filtered_dataframes, current_dataset.id, state)
             logger.info(f"Created plot paths: {plot_paths}")
 
             # Query column information from specs
@@ -210,7 +227,9 @@ class DataCheckerNode:
                 "analysis": analysis_results,
                 "plots": plot_paths,
                 "column_info": column_info,
-                "column_mapping": column_mapping_result
+                "column_mapping": column_mapping_result,
+                "representative_stats": representative_stats,
+                "evaluation_interval": interval,
             }
             current_dataset.status = "data_checked"
 
@@ -223,7 +242,9 @@ class DataCheckerNode:
                     "analysis": analysis_results,
                     "plots": plot_paths,
                     "column_info": column_info,
-                    "column_mapping": column_mapping_result
+                    "column_mapping": column_mapping_result,
+                    "representative_stats": representative_stats,
+                    "evaluation_interval": interval,
                 }
                 logger.info(f"Successfully stored results for dataset {current_dataset.id}")
             except Exception as e:
@@ -247,44 +268,36 @@ class DataCheckerNode:
         plot_paths = {}
 
         try:
-            # Create output directory
-            from ..config import config as global_config
-            plots_dir = global_config.output_dir / "plots" / dataset_id
+            dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset_id)
+            plots_dir = dataset_dirs["images"]
             plots_dir.mkdir(parents=True, exist_ok=True)
 
             for name, df in dataframes.items():
                 if len(df) == 0:
                     continue
 
-                # Determine x axis (prefer frame-based)
                 x_col = None
                 if 'frame_num' in df.columns:
                     x_col = 'frame_num'
                 elif 'frame' in df.columns:
                     x_col = 'frame'
 
-                # Determine y series dynamically based on available columns
                 y_series = []
                 y_label = 'Value'
 
-                # Dynamic column selection based on algorithm configuration
                 available_cols = set(df.columns)
                 numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
 
-                # If we have algorithm config, use it to determine what to plot
                 if hasattr(state, 'algorithm_config') and state.algorithm_config:
-                    config = state.algorithm_config
-                    # For algorithm output files, plot output columns
-                    if any(col in available_cols for col in config.output_columns):
-                        for col in config.output_columns:
+                    config_obj = state.algorithm_config
+                    if any(col in available_cols for col in config_obj.output_columns):
+                        for col in config_obj.output_columns:
                             if col in available_cols:
                                 if col in numeric_cols:
-                                    # Create readable label from column name
                                     label = col.replace('_', ' ').title()
                                     y_series.append((col, label))
                                     y_label = 'Algorithm Output'
                                 elif df[col].dtype in ['object', 'category']:
-                                    # For categorical data, try to convert to numeric if possible
                                     if df[col].str.isnumeric().all():
                                         df_copy = df.copy()
                                         df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
@@ -292,27 +305,22 @@ class DataCheckerNode:
                                             label = col.replace('_', ' ').title()
                                             y_series.append((col, label))
                                             y_label = 'Algorithm Output'
-                    # For core input files, plot input columns
-                    elif any(col in available_cols for col in config.input_columns):
-                        for col in config.input_columns:
+                    elif any(col in available_cols for col in config_obj.input_columns):
+                        for col in config_obj.input_columns:
                             if col in available_cols and col in numeric_cols:
-                                # Create readable label from column name
                                 label = col.replace('_', ' ').title()
                                 y_series.append((col, label))
                                 y_label = 'Input Values'
                 else:
-                    # Fallback: plot first numeric column
-                    num_cols = df.select_dtypes(include=['number']).columns
+                    num_cols = filtered_df.select_dtypes(include=['number']).columns
                     if len(num_cols) > 0:
                         y_series.append((num_cols[0], str(num_cols[0])))
 
                 if x_col is None and len(y_series) == 0:
                     continue
 
-                # Build plotting code
                 series_code_lines = []
                 for col, label in y_series:
-                    # Booleans to int for visualization
                     series_code_lines.append(f"(df['{col}'].astype(int) if df['{col}'].dtype == 'bool' else df['{col}'])")
                 series_code = "\n".join([f"plt.plot(df['{x_col}'] if '{x_col}' in df.columns else df.index, {line}, label='{label}')" for (line, (_, label)) in zip(series_code_lines, y_series)])
 
@@ -326,11 +334,11 @@ plt.ylabel('{y_label}')
 plt.legend()
 plt.tight_layout()
 """
-                plot_path = str(plots_dir / f"{name}_timeseries.png")
-                result = self.repl_tool.create_plot(code, {"df": df}, plot_path)
+                plot_path = plots_dir / f"{name}_timeseries.png"
+                result = self.repl_tool.create_plot(code, {"df": df}, str(plot_path))
 
                 if result.get("success"):
-                    plot_paths[name] = plot_path
+                    plot_paths[name] = plot_path.name
 
         except Exception as e:
             logger.error(f"Failed to create plots: {e}")

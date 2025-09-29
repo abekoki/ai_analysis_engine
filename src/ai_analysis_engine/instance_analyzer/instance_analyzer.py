@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..config.settings import Settings
-from .utils.file_utils import ensure_directory
+from .utils.file_utils import ensure_directory, ensure_analysis_output_structure
+from .utils.logger import update_instance_log_file
 from .config.library_config import AnalysisConfig
 from .library_api import AIAnalysisEngine
 
@@ -28,7 +29,8 @@ class InstanceAnalyzer:
 
     def set_output_base_dir(self, base_dir: Path) -> None:
         self.output_base_dir = Path(base_dir)
-        ensure_directory(str(self.output_base_dir))
+        structure = ensure_analysis_output_structure(self.output_base_dir)
+        update_instance_log_file(structure["logs"] / "instance_analysis.log")
 
     def analyze_instances(self, evaluation_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         logger.info("Starting legacy instance analysis via adapter")

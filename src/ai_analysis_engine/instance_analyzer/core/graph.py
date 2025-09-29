@@ -31,6 +31,7 @@ class AnalysisGraph:
         self.graph = None
         self.nodes = {}
         self._initialize_nodes()
+        self.checkpointer = MemorySaver()
 
     def _initialize_nodes(self):
         """Initialize all workflow nodes"""
@@ -102,8 +103,7 @@ class AnalysisGraph:
         # Reporter is the final node
         workflow.add_edge("reporter", END)
 
-        # Compile the graph without checkpointer to avoid serialization issues
-        self.graph = workflow.compile()
+        self.graph = workflow.compile(checkpointer=self.checkpointer)
         logger.info("Built and compiled LangGraph workflow")
 
         return self.graph
@@ -167,7 +167,6 @@ class AnalysisGraph:
             self.build_graph()
 
         try:
-            # Convert dict to AnalysisState if needed
             if isinstance(initial_state, dict):
                 state = AnalysisState(**initial_state)
             else:
@@ -175,23 +174,31 @@ class AnalysisGraph:
 
             logger.info("Starting analysis workflow")
 
-            # Convert to dict for LangGraph (avoids serialization issues)
             state_dict = state.model_dump()
 
-            # Run the workflow
-            result = self.graph.invoke(state_dict, config={"configurable": {"thread_id": "analysis_workflow"}})
+            thread_id = f"analysis_{state.current_dataset_index}"
+            result = self.graph.invoke(state_dict, config={"configurable": {"thread_id": thread_id}})
 
             logger.info("Analysis workflow completed")
 
-            # Convert result back to AnalysisState if needed
+            if not isinstance(result, dict) and hasattr(result, "model_dump"):
+                result = result.model_dump()
+
             if isinstance(result, dict):
-                # Convert datasets back to DatasetInfo objects
+                if "datasets" not in result and hasattr(state, "datasets"):
+                    result["datasets"] = [ds.model_dump() if hasattr(ds, "model_dump") else ds for ds in state.datasets]
                 if "datasets" in result:
                     from ..models.state import DatasetInfo
                     result["datasets"] = [
                         DatasetInfo(**ds) if isinstance(ds, dict) else ds
                         for ds in result["datasets"]
                     ]
+
+            if hasattr(self.graph, "checkpointer") and hasattr(self.graph.checkpointer, "memory"):
+                memory_snapshots = self.graph.checkpointer.memory.get(thread_id, {})
+                if isinstance(result, dict):
+                    result.setdefault("metadata", {})
+                    result["metadata"]["langgraph_memory"] = memory_snapshots
 
             return result
 

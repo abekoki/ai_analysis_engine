@@ -8,11 +8,18 @@ from langchain_openai import ChatOpenAI
 from pathlib import Path
 from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
+import pandas as pd
 
 if TYPE_CHECKING:
     from ..config.config import AlgorithmConfig
 
 from ..config import config
+from ..utils.file_utils import (
+    encode_file_to_base64,
+    ensure_analysis_output_structure,
+    filter_dataframe_by_interval,
+    get_dataset_output_dirs,
+)
 from ..models.state import DatasetInfo
 from ..models.types import Hypothesis
 from ..tools.repl_tool import REPLTool
@@ -446,6 +453,12 @@ class ReporterAgent:
 評価環境仕様:
 {evaluation_spec}
 
+評価区間:
+{evaluation_interval}
+
+代表値:
+{representative_stats}
+
 分析結果:
 {analysis_results}
 
@@ -540,44 +553,34 @@ class ReporterAgent:
             # Generate visualization plots
             plot_files = self._generate_visualization_plots(dataset, algorithm_config)
 
-            # Prepare report data
-            dataset_info = self._prepare_dataset_info(dataset)
-            analysis_summary = self._summarize_analysis_results(analysis_results)
-            hypotheses_summary = self._summarize_hypotheses(hypotheses)
-            hypotheses_results = hypotheses_summary  # Alias for template compatibility
+            prompt_context = self._prepare_prompt_context(
+                dataset,
+                analysis_results,
+                hypotheses,
+                algorithm_context,
+                plot_files,
+            )
 
-            # Prepare plot links with relative path from reports directory
-            algorithm_plot_link = f"../plots/{dataset.id}/{plot_files['algorithm']}" if plot_files['algorithm'] else ""
-            core_plot_link = f"../plots/{dataset.id}/{plot_files['core']}" if plot_files['core'] else ""
-
-            # Use LLM to generate report with algorithm context
             chain = self.report_prompt | self.llm
 
-            # Log data context used for I/O confirmation result generation
-            logger.info("Data context for I/O confirmation result generation:")
-            logger.info(f"- Dataset ID: {dataset.id}")
-            logger.info(f"- Algorithm spec length: {len(algorithm_spec)} chars (truncated to 3000)")
-            logger.info(f"- Evaluation spec length: {len(evaluation_spec)} chars (truncated to 2000)")
-            logger.info(f"- Analysis results: {len(analysis_results)} chars")
-            logger.info(f"- Hypotheses results: {len(hypotheses_results)} chars")
-            logger.info(f"- Algorithm plot link: {algorithm_plot_link}")
-            logger.info(f"- Core plot link: {core_plot_link}")
-            logger.info(f"- Algorithm context keys: {list(algorithm_context.keys())}")
-
             response = chain.invoke({
-                "dataset_id": dataset.id,
-                "dataset_info": dataset_info,
                 "algorithm_spec": algorithm_spec[:3000],
                 "evaluation_spec": evaluation_spec[:2000],
-                "analysis_results": analysis_summary,
-                "hypotheses_results": hypotheses_summary,
-                "algorithm_plot_link": algorithm_plot_link,
-                "core_plot_link": core_plot_link,
-                **algorithm_context
+                "analysis_results": prompt_context["analysis_summary"],
+                "hypotheses_results": prompt_context["hypotheses_summary"],
+                "representative_stats": prompt_context["representative_stats"],
+                "evaluation_interval": prompt_context["evaluation_interval"],
+                "algorithm_plot_link": prompt_context["algorithm_plot_link"],
+                "core_plot_link": prompt_context["core_plot_link"],
+                "algorithm_plot_base64": prompt_context["algorithm_plot_base64"],
+                "core_plot_base64": prompt_context["core_plot_base64"],
+                **algorithm_context,
+                "dataset_id": dataset.id,
+                "dataset_info": prompt_context["dataset_info"],
             })
 
-            # Process the LLM response
             report_content = response.content.strip()
+            report_content = self._insert_plots_into_report(report_content, plot_files, dataset.id)
 
             # Add algorithm configuration info to report
             if algorithm_config:
@@ -603,44 +606,41 @@ class ReporterAgent:
 """
 
     def _generate_visualization_plots(self, dataset: DatasetInfo, algorithm_config: 'AlgorithmConfig') -> Dict[str, str]:
-        """Generate visualization plots for algorithm and core output data"""
         plot_files = {"algorithm": "", "core": ""}
         try:
             logger.info(f"Generating visualization plots for dataset {dataset.id}")
             logger.info("\n\n\n======\n\n\n")
 
             # Create plots directory in the same location as reports
-            plots_dir = Path("output/results/reports/plots") / dataset.id
+            structure = ensure_analysis_output_structure(config.output_dir)
+            dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset.id)
+            plots_dir = dataset_dirs["images"]
             plots_dir.mkdir(parents=True, exist_ok=True)
 
-            # Load data using REPL tool
-            algorithm_data_path = dataset.algorithm_output_csv
-            core_data_path = dataset.core_output_csv
+            algorithm_df = pd.read_csv(dataset.algorithm_output_csv)
+            core_df = pd.read_csv(dataset.core_output_csv)
+            interval = dataset.data_summary.get("evaluation_interval", {}) if isinstance(dataset.data_summary, dict) else {}
+            filtered_algo_df = filter_dataframe_by_interval(algorithm_df, interval)
+            filtered_core_df = filter_dataframe_by_interval(core_df, interval)
 
-            if algorithm_data_path and core_data_path:
-                # Generate algorithm output plot with target interval filtering
-                algo_plot_path = plots_dir / "algorithm_output_plot.png"
-                self._generate_algorithm_output_plot(algorithm_data_path, algorithm_config, algo_plot_path, dataset)
+            algo_plot_path = plots_dir / "algorithm_output_plot.png"
+            self._generate_algorithm_output_plot(filtered_algo_df, algorithm_config, algo_plot_path, dataset)
 
-                # Generate core output plot with target interval filtering
-                core_plot_path = plots_dir / "core_output_plot.png"
-                self._generate_core_output_plot(core_data_path, algorithm_config, core_plot_path, dataset)
+            core_plot_path = plots_dir / "core_output_plot.png"
+            self._generate_core_output_plot(filtered_core_df, algorithm_config, core_plot_path, dataset)
 
-                # Check actual generated files (they might have different names)
-                actual_files = list(plots_dir.glob("*.png"))
-                logger.info(f"Found plot files in {plots_dir}: {[f.name for f in actual_files]}")
-                if actual_files:
-                    # Sort files by name to ensure consistent ordering
-                    actual_files.sort(key=lambda x: x.name)
-                    # Assume first file is algorithm, second is core
-                    plot_files["algorithm"] = actual_files[0].name if len(actual_files) > 0 else ""
-                    plot_files["core"] = actual_files[1].name if len(actual_files) > 1 else ""
-                    logger.info(f"Assigned plot files: algorithm='{plot_files['algorithm']}', core='{plot_files['core']}'")
+            # Check actual generated files (they might have different names)
+            actual_files = list(plots_dir.glob("*.png"))
+            logger.info(f"Found plot files in {plots_dir}: {[f.name for f in actual_files]}")
+            if actual_files:
+                # Sort files by name to ensure consistent ordering
+                actual_files.sort(key=lambda x: x.name)
+                # Assume first file is algorithm, second is core
+                plot_files["algorithm"] = actual_files[0].name if len(actual_files) > 0 else ""
+                plot_files["core"] = actual_files[1].name if len(actual_files) > 1 else ""
+                logger.info(f"Assigned plot files: algorithm='{plot_files['algorithm']}', core='{plot_files['core']}'")
 
-                logger.info(f"Generated plots for dataset {dataset.id}: {plot_files}")
-            else:
-                logger.warning(f"Data paths not available for dataset {dataset.id}")
-
+            logger.info(f"Generated plots for dataset {dataset.id}: {plot_files}")
         except Exception as e:
             logger.error(f"Failed to generate plots for dataset {dataset.id}: {e}")
 
@@ -714,7 +714,6 @@ x軸に適した列の基準:
                     return col
 
             # Last resort: use first numeric column
-            import pandas as pd
             try:
                 # We can't load the full dataframe here, so return empty and let caller handle
                 return ""
@@ -725,7 +724,7 @@ x軸に適した列の基準:
             logger.error(f"Error inferring x-axis column: {e}")
             return ""
 
-    def _generate_algorithm_output_plot(self, data_path: str, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
+    def _generate_algorithm_output_plot(self, df: pd.DataFrame, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
         """Generate plot for algorithm output data with thresholds"""
         try:
             # Get column mapping from dataset
@@ -767,18 +766,13 @@ x軸に適した列の基準:
             else:
                 relevant_keywords = self._extract_relevant_keywords_from_specs(dataset, algorithm_config)
                 if relevant_keywords:
-                    # Load data to check columns
-                    import pandas as pd
                     try:
-                        df = pd.read_csv(data_path)
-                        # Try to find columns that match the keywords
                         matched_cols = [col for col in df.columns if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
                         if matched_cols:
-                            plot_columns_code = f"plot_columns = {matched_cols[:4]}"  # Limit to 4 columns
+                            plot_columns_code = f"plot_columns = {matched_cols[:4]}"
                             plot_columns = matched_cols[:4]
                             logger.info(f"Algorithm output plot - using RAG-matched columns: {plot_columns}")
                         else:
-                            # Fallback to numeric columns that might match keywords
                             numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                             keyword_matched_numeric = [col for col in numeric_cols if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
                             if keyword_matched_numeric:
@@ -786,21 +780,19 @@ x軸に適した列の基準:
                                 plot_columns = keyword_matched_numeric[:4]
                                 logger.info(f"Algorithm output plot - using keyword-matched numeric columns: {plot_columns}")
                     except Exception as e:
-                        logger.warning(f"Failed to load data for column matching: {e}")
+                        logger.warning(f"Failed to identify columns for algorithm plot: {e}")
 
             # Last resort: use numeric columns
             if not plot_columns:
                 try:
-                    import pandas as pd
-                    df = pd.read_csv(data_path)
                     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                     if numeric_cols:
                         plot_columns_code = f"plot_columns = {numeric_cols[:4]}"
                         plot_columns = numeric_cols[:4]
                         logger.info(f"Algorithm output plot - fallback to numeric columns: {plot_columns}")
                 except Exception as e:
-                    logger.warning(f"Failed to load data for fallback: {e}")
-                    plot_columns_code = "plot_columns = ['column1', 'column2']"  # Dummy fallback
+                    logger.warning(f"Failed to determine numeric columns: {e}")
+                    plot_columns_code = "plot_columns = ['column1', 'column2']"
                     plot_columns = ['column1', 'column2']
 
             logger.info(f"Algorithm output plot - final columns: {plot_columns}")
@@ -817,18 +809,11 @@ x軸に適した列の基準:
                 except Exception as e:
                     logger.warning(f"Failed to load spec for x-axis inference: {e}")
 
-            # Load data to get column list for x-axis inference
-            x_axis_column = ""
-            try:
-                import pandas as pd
-                temp_df = pd.read_csv(data_path)
-                x_axis_column = self._infer_x_axis_column(list(temp_df.columns), spec_content, algorithm_config)
-                if x_axis_column:
-                    logger.info(f"Using inferred x-axis column for algorithm plot: {x_axis_column}")
-                else:
-                    logger.info("No suitable x-axis column found, using default")
-            except Exception as e:
-                logger.warning(f"Failed to infer x-axis column: {e}")
+            x_axis_column = self._infer_x_axis_column(list(df.columns), spec_content, algorithm_config)
+            if x_axis_column:
+                logger.info(f"Using inferred x-axis column for algorithm plot: {x_axis_column}")
+            else:
+                logger.info("No suitable x-axis column found, using default")
 
             # Extract target interval from dataset if available
             target_interval_code = ""
@@ -862,63 +847,45 @@ df = df.reset_index(drop=True)
 
             # Create plot generation code
             plot_code = f"""
-import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 
-# X-axis column configuration
 x_axis_column = '{x_axis_column}'
-
-# Output path configuration
 output_path = r'{str(output_path)}'
 
-# Load data
-df = pd.read_csv(r'{data_path}')
+df = df.copy()
 
-# Filter to target interval if available
 {target_interval_code}
 
-# Define frame range variables for axis limits
 start_frame_val = {start_frame if start_frame is not None else 'None'}
-end_frame_val = {end_frame if end_frame is not None else 'None'}
+end_frame_val = {end_frame if start_frame is not None else 'None'}
 
-# Thresholds configuration
 {thresholds_code}
-
-# Determine columns to plot
 {plot_columns_code}
 
-# Filter to columns that exist in the data
 plot_cols = [col for col in plot_columns if col in df.columns]
 if not plot_cols:
     plot_cols = df.columns[:min(5, len(df.columns))]
 
-# Create figure with subplots
 fig, axes = plt.subplots(len(plot_cols), 1, figsize=(12, 4*len(plot_cols)))
 if len(plot_cols) == 1:
     axes = [axes]
 
-    # Determine x-axis data using inferred column
-    x_data = df.index
-    x_label = 'Index'
-    if x_axis_column and x_axis_column in df.columns:
-        x_data = df[x_axis_column]
-        x_label = x_axis_column.replace('_', ' ').title()
-    else:
-        # Fallback to common patterns
-        for col in ['frame', 'frame_num', 'timestamp', 'time']:
-            if col in df.columns:
-                x_data = df[col]
-                x_label = col.replace('_', ' ').title()
-                break
+x_data = df.index
+x_label = 'Index'
+if x_axis_column and x_axis_column in df.columns:
+    x_data = df[x_axis_column]
+    x_label = x_axis_column.replace('_', ' ').title()
+else:
+    for col in ['frame', 'frame_num', 'timestamp', 'time']:
+        if col in df.columns:
+            x_data = df[col]
+            x_label = col.replace('_', ' ').title()
+            break
 
-# Plot each column with thresholds
 for i, col in enumerate(plot_cols):
     axes[i].plot(x_data, df[col], label=col, linewidth=2)
 
-    # Add threshold lines if available and column matches threshold
     for threshold_name, threshold_value in thresholds:
-        # Apply threshold if column name matches threshold name (case-insensitive partial match)
         if threshold_name.lower().replace('_threshold', '').replace('_', '') in col.lower():
             label_text = threshold_name + ': ' + str(threshold_value)
             axes[i].axhline(y=threshold_value, color='red', linestyle='--', label=label_text)
@@ -946,7 +913,7 @@ plt.close()
         except Exception as e:
             logger.error(f"Error generating algorithm output plot: {e}")
 
-    def _generate_core_output_plot(self, data_path: str, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
+    def _generate_core_output_plot(self, df: pd.DataFrame, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
         """Generate plot for core output data with thresholds"""
         try:
             # Get column mapping from dataset
@@ -971,30 +938,23 @@ plt.close()
             else:
                 relevant_keywords = self._extract_relevant_keywords_from_specs(dataset, algorithm_config)
                 if relevant_keywords:
-                    # Load data to check columns
-                    import pandas as pd
                     try:
-                        df = pd.read_csv(data_path)
-                        # Find columns that match the keywords
                         matched_cols = [col for col in df.columns if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
                         if matched_cols:
                             input_cols = matched_cols[:6]  # Limit to 6 columns for core plots
                             logger.info(f"Core output plot - using RAG-matched columns: {input_cols}")
                         else:
-                            # Fallback to numeric columns that might match keywords
                             numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                             keyword_matched_numeric = [col for col in numeric_cols if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
                             if keyword_matched_numeric:
                                 input_cols = keyword_matched_numeric[:6]
                                 logger.info(f"Core output plot - using keyword-matched numeric columns: {input_cols}")
                     except Exception as e:
-                        logger.warning(f"Failed to load data for column matching: {e}")
+                        logger.warning(f"Failed to identify columns for core plot: {e}")
 
             # Last resort: use numeric columns
             if not input_cols:
                 try:
-                    import pandas as pd
-                    df = pd.read_csv(data_path)
                     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
                     if numeric_cols:
                         # Prefer common eye-tracking columns
@@ -1002,8 +962,8 @@ plt.close()
                         input_cols = (preferred_cols + numeric_cols)[:6]  # Combine preferred and others
                         logger.info(f"Core output plot - fallback to numeric columns: {input_cols}")
                 except Exception as e:
-                    logger.warning(f"Failed to load data for fallback: {e}")
-                    input_cols = ['face_confidence', 'leye_openness', 'reye_openness']  # Eye-tracking fallback
+                    logger.warning(f"Failed to determine numeric columns for core plot: {e}")
+                    input_cols = ['face_confidence', 'leye_openness', 'reye_openness']
 
             input_cols_str = str(input_cols)
             logger.info(f"Core output plot - final input columns: {input_cols}")
@@ -1020,18 +980,11 @@ plt.close()
                 except Exception as e:
                     logger.warning(f"Failed to load spec for core plot x-axis inference: {e}")
 
-            # Load data to get column list for x-axis inference
-            x_axis_column = ""
-            try:
-                import pandas as pd
-                temp_df = pd.read_csv(data_path)
-                x_axis_column = self._infer_x_axis_column(list(temp_df.columns), spec_content, algorithm_config)
-                if x_axis_column:
-                    logger.info(f"Using inferred x-axis column for core plot: {x_axis_column}")
-                else:
-                    logger.info("No suitable x-axis column found for core plot, using default")
-            except Exception as e:
-                logger.warning(f"Failed to infer x-axis column for core plot: {e}")
+            x_axis_column = self._infer_x_axis_column(list(df.columns), spec_content, algorithm_config)
+            if x_axis_column:
+                logger.info(f"Using inferred x-axis column for core plot: {x_axis_column}")
+            else:
+                logger.info("No suitable x-axis column found for core plot, using default")
 
             thresholds_code = ""
             if column_mapping and 'thresholds' in column_mapping:
@@ -1094,14 +1047,14 @@ x_axis_column = '{x_axis_column}'
 output_path = r'{str(output_path)}'
 
 # Load data
-df = pd.read_csv(r'{data_path}')
+df = pd.read_csv(r'{dataset.core_output_csv}') # Use provided df
 
 # Filter to target interval if available
 {target_interval_code}
 
 # Define frame range variables for axis limits
 start_frame_val = {start_frame if start_frame is not None else 'None'}
-end_frame_val = {end_frame if end_frame is not None else 'None'}
+end_frame_val = {end_frame if start_frame is not None else 'None'}
 
 # Input columns and thresholds configuration
 input_cols = {input_cols_str}
@@ -1262,12 +1215,14 @@ else:
         ]
 
         # Add evaluation interval information if available
+        interval_line = "フレーム区間: 未指定"
         if dataset.evaluation_interval:
             interval = dataset.evaluation_interval
-            if interval.get('start') is not None and interval.get('end') is not None:
-                info_lines.append(f"フレーム区間: {interval['start']} - {interval['end']}")
-            else:
-                info_lines.append("フレーム区間: 未指定")
+            start = interval.get("start") or interval.get("start_frame")
+            end = interval.get("end") or interval.get("end_frame")
+            if start is not None and end is not None:
+                interval_line = f"フレーム区間: {start} - {end}"
+        info_lines.append(interval_line)
 
         return "\n".join(info_lines)
 
@@ -1442,3 +1397,63 @@ plt.tight_layout()
 - エラーの原因を調査してください
 - ログを確認して問題を特定してください
 """
+
+    def _prepare_prompt_context(
+            self,
+            dataset: DatasetInfo,
+            analysis_results: Dict[str, Any],
+            hypotheses: List[Hypothesis],
+            algorithm_context: Dict[str, Any],
+            plot_files: Dict[str, str],
+    ) -> Dict[str, Any]:
+        representative_stats = dataset.data_summary.get("representative_stats", {}) if isinstance(dataset.data_summary, dict) else {}
+        evaluation_interval = dataset.data_summary.get("evaluation_interval", {}) if isinstance(dataset.data_summary, dict) else {}
+        interval_line = "フレーム区間: 未指定"
+        if evaluation_interval:
+            start = evaluation_interval.get("start") or evaluation_interval.get("start_frame")
+            end = evaluation_interval.get("end") or evaluation_interval.get("end_frame")
+            if start is not None and end is not None:
+                interval_line = f"フレーム区間: {start} - {end}"
+
+        stats_lines = []
+        for source, stats in representative_stats.items():
+            stats_lines.append(f"### {source}")
+            for column, values in stats.items():
+                stats_lines.append(
+                    f"- {column}: mean={values.get('mean')}, median={values.get('median')}, min={values.get('min')}, max={values.get('max')}"
+                )
+        stats_text = "\n".join(stats_lines) if stats_lines else "データがありません"
+
+        dataset_info = self._prepare_dataset_info(dataset)
+        analysis_summary = self._summarize_analysis_results(analysis_results)
+        hypotheses_summary = self._summarize_hypotheses(hypotheses)
+
+        dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset.id)
+        algorithm_plot_link = ""
+        core_plot_link = ""
+        algorithm_plot_b64 = ""
+        core_plot_b64 = ""
+
+        if plot_files.get("algorithm"):
+            algorithm_plot_link = f"../images/{dataset.id}/{plot_files['algorithm']}"
+            algorithm_plot_path = dataset_dirs["images"] / plot_files["algorithm"]
+            algorithm_plot_b64 = encode_file_to_base64(algorithm_plot_path)
+
+        if plot_files.get("core"):
+            core_plot_link = f"../images/{dataset.id}/{plot_files['core']}"
+            core_plot_path = dataset_dirs["images"] / plot_files["core"]
+            core_plot_b64 = encode_file_to_base64(core_plot_path)
+
+        return {
+            "dataset_id": dataset.id,
+            "dataset_info": dataset_info,
+            "analysis_summary": analysis_summary,
+            "hypotheses_summary": hypotheses_summary,
+            "algorithm_plot_link": algorithm_plot_link,
+            "core_plot_link": core_plot_link,
+            "algorithm_plot_base64": algorithm_plot_b64,
+            "core_plot_base64": core_plot_b64,
+            "representative_stats": stats_text,
+            "evaluation_interval": interval_line,
+            **algorithm_context,
+        }

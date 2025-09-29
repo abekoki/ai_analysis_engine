@@ -1,0 +1,97 @@
+2025-09-29 14:55:51,186 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-09-29 14:55:51,186 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-09-29 14:55:51,217 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-09-29 14:55:51,218 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-09-29 14:55:51,218 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-09-29 14:55:51,219 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-09-29 14:55:51,219 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-09-29 14:55:51,219 - ai_analysis_engine.performance_analyzer.performance_analyzer - INFO - Starting performance analysis
+2025-09-29 14:55:51,220 - ai_analysis_engine.performance_analyzer.performance_analyzer - ERROR - Visualization generation failed: No module named 'sklearn'
+2025-09-29 14:55:51,220 - ai_analysis_engine.performance_analyzer.performance_analyzer - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-09-29 14:55:51,220 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-09-29 14:55:51,220 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-09-29 14:55:51,220 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Starting legacy instance analysis via adapter
+2025-09-29 14:55:51,220 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - evaluation_data keys: ['metadata', 'data', 'evaluation_result_id', 'algorithm_outputs', 'core_outputs']
+2025-09-29 14:55:51,222 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Initializing AI Analysis Engine...
+2025-09-29 14:55:52,117 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Initialized all workflow nodes
+2025-09-29 14:55:52,130 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Built and compiled LangGraph workflow
+2025-09-29 14:55:52,130 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - AI Analysis Engine initialized successfully
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Original core_dir: ../DataWareHouse/02_core_lib_output/v1.0.0/4
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Replaced core_dir: ../development_datas/02_core_lib_output/v1.0.0/4
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Final core_dir: ../development_datas/02_core_lib_output/v1.0.0/4
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Core dir exists, contents: ['WIN_20250819_10_16_17_Pro_analysis.csv', 'WIN_20250819_10_16_17_Pro_analysis_debug.mp4']
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df type: <class 'pandas.core.frame.DataFrame'>, is None: False
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df columns: ['task_id', 'video_ID', 'tag_ID', 'task_ID', 'start', 'end', 'expected_is_drowsy', 'is_drowsy', 'is_correct', 'algorithm_output_ID', 'algorithm_output_dir', 'core_lib_output_ID', 'core_lib_output_dir', 'video_dir']
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df shape: (20, 14)
+2025-09-29 14:55:52,130 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Processing expected_is_drowsy column
+2025-09-29 14:55:52,131 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - is_correct values: {0: 11, 1: 9}
+2025-09-29 14:55:52,131 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Filtering to failed tasks only: 11 failed tasks out of 20 total tasks
+2025-09-29 14:55:52,132 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Before expansion - algorithm_outputs: 4, core_outputs: 1, expected_results: 11
+2025-09-29 14:55:52,132 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - After expansion - algorithm_outputs: 11, core_outputs: 11, expected_results: 11
+2025-09-29 14:55:52,132 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,133 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,133 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,133 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,133 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,133 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,134 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,135 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,136 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,137 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,138 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-09-29 14:55:52,138 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-09-29 14:55:52,138 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-09-29 14:55:52,138 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - ERROR - Analysis workflow failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,138 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - ERROR - Analysis failed: 'AnalysisState' object has no attribute 'get'
+2025-09-29 14:55:52,138 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 11 instances analyzed
+2025-09-29 14:55:52,139 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Analysis failed: 'NoneType' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 184, in run_analysis_by_evaluation_result
+    integrated_results = self._integrate_results(performance_results, instance_results)
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 357, in _integrate_results
+    'recommendations': self._generate_recommendations(performance_results, instance_results),
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 379, in _generate_recommendations
+    if result.get('summary', {}).get('has_errors', False)]
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'

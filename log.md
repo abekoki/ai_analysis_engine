@@ -1,10 +1,7 @@
-## 2025-09-24
-- DataWareHouseパッケージ移行・インスタンスアナライザ互換層実装。
-- DataWareHouse: `uv pip install git+https://github.com/abekoki/DataWareHouse@remake_pip_lib` で公式パッケージを導入。
-- 設定: `config/default_config.yaml` の `global.database_path`/`datawarehouse_path` を `../development_datas/` 系に更新し、`external_resources_path` を追加。
-- 互換レイヤー: `src/ai_analysis_engine/instance_analyzer/instance_analyzer.py` を新規実装し、旧 `InstanceAnalyzer` API から `library_api.AIAnalysisEngine` に委譲。RAG初期化用に `external/` 配下の仕様書・コード・評価環境を収集。
-- DataLoader: `src/ai_analysis_engine/utils/data_loader.py` を新パッケージ構造に合わせてリファクタリングし、`DataWareHouseConnector` からローカルリポジトリ依存を排除。
-- ドキュメント: README と `docs/detailed_design_spec.md` の DataWareHouse パス/導入手順を更新。`instance_analyzer.__init__` に互換クラスをエクスポート。
+# 2025-09-29
+- InstanceAnalyzer 個別課題分析フローの改善項目対応を実施。図生成・代表値算出の評価区間適用、代表値／画像のプロンプト連携、出力ディレクトリ構造統一、LangGraph対話履歴保存、ログ配置変更などを完了。
+- 主な修正: `utils/file_utils.py` に共通ユーティリティ追加、`core/nodes.py` / `agents/reporter_agent.py` でのフィルタリングと統計計算修正、`logger.py` でラン毎ログ設定、`main.py` の成果物書き出し整理、テンプレート更新等。
+- LangGraph MemorySaver を導入し、実行コンテキストを `logs/langgraph_context/` に保存。テンプレート・プロンプトが代表値／画像リンクを参照するよう調整。
 # AI分析エンジン開発ログ
 
 ## 2025-09-03

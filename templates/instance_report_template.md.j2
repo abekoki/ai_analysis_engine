@@ -24,6 +24,12 @@
 {% endfor %}
 {% endif %}
 
+## 代表値
+{{ representative_stats or 'データがありません' }}
+
+## LangGraphコンテキスト
+{% if langgraph_context_path %}[対話履歴を見る]({{ langgraph_context_path }}){% else %}記録なし{% endif %}
+
 ## 仮説分析
 - 仮説: {{ hypothesis_results.get('hypothesis', 'N/A') }}
 - 検証結果: {{ '有効' if hypothesis_results.get('verification', {}).get('valid', False) else '無効' }}

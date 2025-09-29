@@ -7,7 +7,7 @@ import logging.handlers
 from pathlib import Path
 from typing import Optional
 
-# from ..config import config  # Avoid circular import
+instance_log_handler: Optional[logging.Handler] = None
 
 
 def setup_logging(
@@ -58,6 +58,9 @@ def setup_logging(
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
+    global instance_log_handler
+    instance_log_handler = file_handler if log_file else None
+
     return logger
 
 
@@ -79,6 +82,29 @@ def ensure_log_directory(log_file: str) -> None:
     if log_file:
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def update_instance_log_file(log_path: Path) -> None:
+    """Update logger to use per-instance log file."""
+
+    logger = logging.getLogger("ai_analysis_engine")
+    global instance_log_handler
+
+    if instance_log_handler:
+        logger.removeHandler(instance_log_handler)
+        instance_log_handler = None
+
+    ensure_log_directory(str(log_path))
+    handler = logging.handlers.RotatingFileHandler(
+        str(log_path),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+    )
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    instance_log_handler = handler
 
 
 # Global logger setup

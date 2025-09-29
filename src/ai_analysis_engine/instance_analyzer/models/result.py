@@ -73,7 +73,8 @@ class AnalysisResult(BaseModel):
         plots: List[str] = None,
         summary: str = None,
         metrics: AnalysisMetrics = None,
-        report_path: str = None
+        report_path: str = None,
+        raw_data: Dict[str, Any] | None = None,
     ) -> "AnalysisResult":
         """
         成功時の結果を作成
@@ -98,7 +99,8 @@ class AnalysisResult(BaseModel):
             hypotheses=hypotheses,
             plots=plots or [],
             metrics=metrics or AnalysisMetrics(),
-            report_path=report_path
+            report_path=report_path,
+            raw_data=raw_data,
         )
 
     @classmethod
