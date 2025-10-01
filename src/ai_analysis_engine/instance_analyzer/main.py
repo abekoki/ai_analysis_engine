@@ -11,7 +11,7 @@ from .config import config
 from .models.state import AnalysisState, DatasetInfo
 from .core.graph import AnalysisGraph
 from .utils.logger import get_logger, setup_logging
-from .utils.file_utils import ensure_analysis_output_structure, write_file
+from .utils.file_utils import ensure_analysis_output_structure, write_file, get_report_paths
 
 logger = get_logger(__name__)
 
@@ -141,7 +141,7 @@ class AIAnalysisEngine:
         self.logger.info(f"Created analysis request with {len(datasets)} datasets")
         return state
 
-    def run_analysis(self, state: AnalysisState) -> Dict[str, Any]:
+    def run_analysis(self, state: AnalysisState, *, max_instances: Optional[int] = None) -> Dict[str, Any]:
         """
         Run the complete analysis workflow
 
@@ -157,8 +157,12 @@ class AIAnalysisEngine:
         try:
             self.logger.info("Starting analysis workflow...")
 
+            state_dict = state.model_dump()
+            if max_instances is not None:
+                state_dict["max_instances"] = max_instances
+
             # Run the analysis
-            result = self.graph.run_analysis(state.model_dump())
+            result = self.graph.run_analysis(state_dict)
 
             # Update end time
             result["end_time"] = self._get_current_time()
@@ -180,30 +184,52 @@ class AIAnalysisEngine:
     def _save_results(self, results: Dict[str, Any], custom_output_dir: Optional[str] = None) -> None:
         """Save analysis results to files"""
         base_dir = Path(custom_output_dir) if custom_output_dir else Path(config.output_dir)
-        structure = ensure_analysis_output_structure(base_dir)
-        output_dir = structure["results"]
-
         # Save individual reports first (independent of JSON saving)
         try:
             if "datasets" in results:
-                reports_dir = output_dir / "reports"
-                reports_dir.mkdir(exist_ok=True)
-
                 for dataset in results["datasets"]:
                     if hasattr(dataset, 'report_content') and dataset.report_content and hasattr(dataset, 'id'):
-                        report_file = reports_dir / f"{dataset.id}_report.md"
+                        report_paths = get_report_paths(base_dir, f"report_{dataset.id}")
+                        report_file = report_paths["report_dir"] / f"report_{dataset.id}.md"
                         write_file(str(report_file), dataset.report_content)
                         self.logger.info(f"Report saved: {report_file}")
         except Exception as e:
             self.logger.error(f"Failed to save reports: {e}")
 
-        # Save main results (JSON) - with enhanced error handling
+        try:
+            per_dataset_results: List[Dict[str, Any]] = []
+            if "datasets" in results:
+                for dataset in results["datasets"]:
+                    dataset_data = dataset.model_dump() if hasattr(dataset, "model_dump") else dataset
+                    dataset_id = dataset_data.get("id") or dataset_data.get("dataset_id")
+                    if not dataset_id:
+                        continue
+
+                    report_paths = get_report_paths(base_dir, f"report_{dataset_id}")
+
+                    if dataset_data.get("report_content"):
+                        report_file = report_paths["report_dir"] / f"report_{dataset_id}.md"
+                        write_file(str(report_file), dataset_data["report_content"])
+                        self.logger.info(f"Report saved: {report_file}")
+
+                    dataset_json_file = report_paths["report_dir"] / "analysis_results.json"
+                    dataset_serializable = self._make_serializable(dataset_data)
+                    with open(dataset_json_file, "w", encoding="utf-8") as f:
+                        json.dump(dataset_serializable, f, indent=2, ensure_ascii=False, default=str)
+                    self.logger.info(f"Dataset JSON saved: {dataset_json_file}")
+
+                    per_dataset_results.append(dataset_serializable)
+            else:
+                self.logger.warning("No dataset results found to save per dataset")
+        except Exception as e:
+            self.logger.error(f"Failed to save per-dataset results: {e}")
+
         try:
             serializable_results = self._make_serializable(results)
+            serializable_results["datasets"] = per_dataset_results
             if "langgraph_memory" in results:
                 serializable_results["langgraph_memory"] = results["langgraph_memory"]
 
-            # Additional check for any remaining non-serializable objects
             def check_serializable(obj, path="root"):
                 if isinstance(obj, dict):
                     for key, value in obj.items():
@@ -219,8 +245,7 @@ class AIAnalysisEngine:
 
             check_serializable(serializable_results)
 
-            # Save main results
-            results_file = output_dir / "analysis_results.json"
+            results_file = base_dir / "summary" / "analysis_results.json"
             with open(results_file, 'w', encoding='utf-8') as f:
                 json.dump(serializable_results, f, indent=2, ensure_ascii=False, default=str)
 
@@ -229,7 +254,7 @@ class AIAnalysisEngine:
         except Exception as e:
             self.logger.error(f"Failed to save JSON results: {e}")
             try:
-                error_file = output_dir / "error_summary.json"
+                error_file = base_dir / "summary" / "error_summary.json"
                 error_summary = {
                     "error": str(e),
                     "timestamp": self._get_current_time(),
@@ -241,7 +266,7 @@ class AIAnalysisEngine:
             except Exception as e2:
                 self.logger.error(f"Failed to save error summary: {e2}")
 
-        self.logger.info(f"Results processing completed in {output_dir}")
+        self.logger.info(f"Results processing completed in {base_dir}")
 
     def _make_serializable(self, obj: Any) -> Any:
         """Convert objects to JSON serializable format"""

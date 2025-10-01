@@ -15,7 +15,7 @@ from ..config import config
 from ..utils.file_utils import (
     compute_representative_stats,
     filter_dataframe_by_interval,
-    get_dataset_output_dirs,
+    get_report_paths,
 )
 
 logger = get_logger(__name__)
@@ -106,6 +106,7 @@ class SupervisorNode:
         logger.info("Supervisor processing")
 
         current_dataset = state.get_current_dataset()
+        max_instances = getattr(state, "max_instances", None)
 
         if current_dataset is None:
             # All datasets processed
@@ -268,25 +269,35 @@ class DataCheckerNode:
         plot_paths = {}
 
         try:
-            dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset_id)
-            plots_dir = dataset_dirs["images"]
-            plots_dir.mkdir(parents=True, exist_ok=True)
+            dataset_paths = get_report_paths(config.output_dir, f"report_{dataset_id}")
+            plots_dir = dataset_paths["images"]
+
+            interval: Dict[str, Any] = {}
+            if state and hasattr(state, "current_dataset"):
+                current_ds = state.get_current_dataset()
+                if current_ds and getattr(current_ds, "evaluation_interval", None):
+                    interval = current_ds.evaluation_interval
 
             for name, df in dataframes.items():
                 if len(df) == 0:
                     continue
 
+                filtered_df = filter_dataframe_by_interval(df, interval)
+                if filtered_df.empty:
+                    logger.warning("Filtered dataframe for %s is empty after applying evaluation interval; skipping plot.", name)
+                    continue
+
                 x_col = None
-                if 'frame_num' in df.columns:
+                if 'frame_num' in filtered_df.columns:
                     x_col = 'frame_num'
-                elif 'frame' in df.columns:
+                elif 'frame' in filtered_df.columns:
                     x_col = 'frame'
 
                 y_series = []
                 y_label = 'Value'
 
-                available_cols = set(df.columns)
-                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                available_cols = set(filtered_df.columns)
+                numeric_cols = filtered_df.select_dtypes(include=['number']).columns.tolist()
 
                 if hasattr(state, 'algorithm_config') and state.algorithm_config:
                     config_obj = state.algorithm_config
@@ -312,9 +323,12 @@ class DataCheckerNode:
                                 y_series.append((col, label))
                                 y_label = 'Input Values'
                 else:
-                    num_cols = filtered_df.select_dtypes(include=['number']).columns
-                    if len(num_cols) > 0:
-                        y_series.append((num_cols[0], str(num_cols[0])))
+                    numeric_candidates = df.select_dtypes(include=['number']).columns
+                    if len(numeric_candidates) > 0:
+                        primary_col = numeric_candidates[0]
+                        if 'continuous_time' in numeric_candidates:
+                            primary_col = 'continuous_time'
+                        y_series.append((primary_col, str(primary_col)))
 
                 if x_col is None and len(y_series) == 0:
                     continue

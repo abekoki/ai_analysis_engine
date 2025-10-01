@@ -214,35 +214,57 @@ def ensure_analysis_output_structure(base_dir: Path) -> Dict[str, Path]:
     """
 
     base_path = Path(base_dir)
-    results_dir = base_path / "results"
-    reports_dir = results_dir / "reports"
-    images_dir = base_path / "images"
-    logs_dir = base_path / "logs"
-    langgraph_dir = logs_dir / "langgraph_context"
+    summary_dir = base_path / "summary"
+    data_dir = base_path / "data"
+    charts_dir = base_path / "charts"
 
-    for path in (results_dir, reports_dir, images_dir, logs_dir, langgraph_dir):
+    for path in (summary_dir, data_dir, charts_dir):
         path.mkdir(parents=True, exist_ok=True)
 
     return {
         "base": base_path,
-        "results": results_dir,
-        "reports": reports_dir,
-        "images": images_dir,
-        "logs": logs_dir,
-        "langgraph": langgraph_dir,
+        "summary": summary_dir,
+        "data": data_dir,
+        "charts": charts_dir,
     }
 
 
-def get_dataset_output_dirs(base_dir: Path, dataset_id: str) -> Dict[str, Path]:
-    """Return dataset-specific output directories, creating them if necessary."""
+def get_report_paths(base_dir: Path, report_id: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Path]:
+    """Create and return structured paths for a report output.
+
+    The directory names move away from dataset-specific terminology so that the
+    same helper can be reused for heterogeneous algorithms.
+
+    Args:
+        base_dir: Base directory for the current analysis run.
+        report_id: Identifier for the report folder (e.g. "report_1_4").
+        context: Optional metadata used for future extensions.
+
+    Returns:
+        Mapping of logical names to filesystem `Path` objects.
+    """
 
     structure = ensure_analysis_output_structure(base_dir)
-    dataset_images = structure["images"] / dataset_id
-    dataset_reports = structure["reports"]
-    dataset_images.mkdir(parents=True, exist_ok=True)
+    report_dir = structure["base"] / report_id
+
+    artifacts_dir = report_dir / "artifacts"
+    images_dir = report_dir / "viz"
+    logs_dir = report_dir / "logs"
+    langgraph_dir = report_dir / "contexts"
+
+    for path in (report_dir, artifacts_dir, images_dir, logs_dir, langgraph_dir):
+        path.mkdir(parents=True, exist_ok=True)
+
     return {
-        "images": dataset_images,
-        "reports": dataset_reports,
+        "report_dir": report_dir,
+        "artifacts": artifacts_dir,
+        "images": images_dir,
+        "logs": logs_dir,
+        "contexts": langgraph_dir,
+        "summary": structure["summary"],
+        "data": structure["data"],
+        "charts": structure["charts"],
+        "context": context or {},
     }
 
 

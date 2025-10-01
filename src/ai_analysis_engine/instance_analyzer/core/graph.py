@@ -2,7 +2,7 @@
 Main LangGraph workflow for AI Analysis Engine
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -153,7 +153,7 @@ class AnalysisGraph:
         # Report regardless of success to avoid infinite loops; the report will reflect outcome
         return "reporter"
 
-    def run_analysis(self, initial_state: Dict[str, Any]) -> Dict[str, Any]:
+    def run_analysis(self, initial_state: Dict[str, Any], max_instances: Optional[int] = None) -> Dict[str, Any]:
         """
         Run the complete analysis workflow
 
@@ -168,6 +168,8 @@ class AnalysisGraph:
 
         try:
             if isinstance(initial_state, dict):
+                if max_instances is not None:
+                    initial_state.setdefault("max_instances", max_instances)
                 state = AnalysisState(**initial_state)
             else:
                 state = initial_state
@@ -175,6 +177,8 @@ class AnalysisGraph:
             logger.info("Starting analysis workflow")
 
             state_dict = state.model_dump()
+            if max_instances is not None:
+                state_dict["max_instances"] = max_instances
 
             thread_id = f"analysis_{state.current_dataset_index}"
             result = self.graph.invoke(state_dict, config={"configurable": {"thread_id": thread_id}})

@@ -92,7 +92,7 @@ class Orchestrator:
 
         return logger
 
-    def run_analysis(self, algorithm_output_id: Optional[int] = None) -> Dict[str, Any]:
+    def run_analysis(self, algorithm_output_id: Optional[int] = None, *, max_instances: Optional[int] = None) -> Dict[str, Any]:
         """分析実行
 
         Args:
@@ -115,7 +115,10 @@ class Orchestrator:
 
             # 3. 個別データ分析を実行
             self.logger.info("Running instance analysis...")
-            instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+            instance_results = self.instance_analyzer.analyze_instances(
+                evaluation_data,
+                max_instances=max_instances,
+            )
             enriched_results = []
             raw_datasets = []
             for res in instance_results:
@@ -170,7 +173,7 @@ class Orchestrator:
                 'timestamp': datetime.now().isoformat()
             }
 
-    def run_analysis_by_evaluation_result(self, evaluation_result_id: int) -> Dict[str, Any]:
+    def run_analysis_by_evaluation_result(self, evaluation_result_id: int, *, max_instances: Optional[int] = None) -> Dict[str, Any]:
         """evaluation_result_ID を指定して分析実行"""
         try:
             self.logger.info(f"Starting analysis for evaluation_result_id: {evaluation_result_id}")
@@ -187,7 +190,10 @@ class Orchestrator:
             # 3. 個別データ分析（失敗タスクのみ対象）
             self.logger.info("Running instance analysis...")
             try:
-                instance_results = self.instance_analyzer.analyze_instances(evaluation_data)
+                instance_results = self.instance_analyzer.analyze_instances(
+                    evaluation_data,
+                    max_instances=max_instances,
+                )
                 self.logger.info(f"Instance analysis completed: {len(instance_results)} instances analyzed")
             except Exception as e:
                 self.logger.error(f"Instance analysis failed: {str(e)}", exc_info=True)
@@ -272,7 +278,8 @@ class Orchestrator:
                 self.logger.info(f"Algorithm ID from metadata: {algorithm_id}")
 
                 # アルゴリズム出力を取得
-                algorithm_outputs = []
+                algorithm_outputs: List[Dict[str, Any]] = []
+                core_outputs: List[Dict[str, Any]] = []
                 if algorithm_id:
                     try:
                         # datawarehouseパッケージから直接関数を呼び出し
@@ -282,20 +289,19 @@ class Orchestrator:
                         if outputs:
                             # 最新の出力を取得
                             latest_output = outputs[-1]
-                        output_data = get_algorithm_output(latest_output['algorithm_output_ID'], str(self.datawarehouse.db_path))
-                        algorithm_outputs = [output_data] if output_data else []
-                        self.logger.info(f"Retrieved algorithm output: {bool(algorithm_outputs)}")
+                            output_data = get_algorithm_output(latest_output['algorithm_output_ID'], str(self.datawarehouse.db_path))
+                            algorithm_outputs = [output_data] if output_data else []
+                            self.logger.info(f"Retrieved algorithm output: {bool(algorithm_outputs)}")
 
-                        # アルゴリズム出力に含まれるcore_lib_output_IDからcore_outputsを取得
-                        core_lib_output_id = latest_output.get('core_lib_output_ID')
-                        core_outputs = []
-                        if core_lib_output_id:
-                            try:
-                                core_output_data = get_core_lib_output(core_lib_output_id, str(self.datawarehouse.db_path))
-                                core_outputs = [core_output_data] if core_output_data else []
-                                self.logger.info(f"Retrieved core output: {bool(core_outputs)}")
-                            except Exception as e:
-                                self.logger.warning(f"コアライブラリ出力取得失敗 (ID: {core_lib_output_id}): {str(e)}")
+                            # アルゴリズム出力に含まれるcore_lib_output_IDからcore_outputsを取得
+                            core_lib_output_id = latest_output.get('core_lib_output_ID')
+                            if core_lib_output_id:
+                                try:
+                                    core_output_data = get_core_lib_output(core_lib_output_id, str(self.datawarehouse.db_path))
+                                    core_outputs = [core_output_data] if core_output_data else []
+                                    self.logger.info(f"Retrieved core output: {bool(core_outputs)}")
+                                except Exception as e:
+                                    self.logger.warning(f"コアライブラリ出力取得失敗 (ID: {core_lib_output_id}): {str(e)}")
                         else:
                             self.logger.warning(f"No algorithm outputs found for algorithm_ID: {algorithm_id}")
                     except Exception as e:
@@ -321,7 +327,8 @@ class Orchestrator:
                 self.logger.warning(f"Failed to get evaluation metadata: {str(e)}")
                 algorithm_id = None
 
-            algorithm_outputs = []
+            algorithm_outputs: List[Dict[str, Any]] = []
+            core_outputs: List[Dict[str, Any]] = []
             if algorithm_id:
                 try:
                     # datawarehouseパッケージから直接関数を呼び出し
@@ -337,7 +344,6 @@ class Orchestrator:
 
                         # アルゴリズム出力に含まれるcore_lib_output_IDからcore_outputsを取得
                         core_lib_output_id = latest_output.get('core_lib_output_ID')
-                        core_outputs = []
                         if core_lib_output_id:
                             try:
                                 core_output_data = get_core_lib_output(core_lib_output_id, str(self.datawarehouse.db_path))
@@ -364,9 +370,25 @@ class Orchestrator:
     def _integrate_results(self, performance_results: Dict[str, Any],
                           instance_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """結果を統合"""
+        performance_summary = {}
+        if isinstance(performance_results, dict):
+            performance_summary = performance_results.get('summary') or {}
+            if not isinstance(performance_summary, dict):
+                performance_summary = {}
+
+        instance_summaries = []
+        if isinstance(instance_results, list):
+            for result in instance_results:
+                if isinstance(result, dict):
+                    summary = result.get('summary') or {}
+                    if isinstance(summary, dict):
+                        instance_summaries.append(summary)
+                    else:
+                        instance_summaries.append({})
+
         integrated = {
-            'performance_summary': performance_results.get('summary', {}),
-            'instance_summaries': [result.get('summary', {}) for result in instance_results if isinstance(result, dict)],
+            'performance_summary': performance_summary,
+            'instance_summaries': instance_summaries,
             'recommendations': self._generate_recommendations(performance_results, instance_results),
             'analysis_timestamp': datetime.now().isoformat()
         }
@@ -379,7 +401,7 @@ class Orchestrator:
         recommendations = []
 
         # 性能分析結果に基づく提案
-        perf_summary = performance_results.get('summary', {})
+        perf_summary = performance_results.get('summary', {}) if isinstance(performance_results, dict) else {}
         accuracy = perf_summary.get('accuracy', 0)
 
         if isinstance(accuracy, (int, float)) and accuracy < 0.8:
@@ -388,7 +410,15 @@ class Orchestrator:
             recommendations.append("正解率が90%未満です。さらに精度向上の余地があります。")
 
         # 個別分析結果に基づく提案
-        error_instances = [res for res in instance_results if isinstance(res, dict) and res.get('summary', {}).get('has_errors')]
+        error_instances = []
+        if isinstance(instance_results, list):
+            for res in instance_results:
+                if not isinstance(res, dict):
+                    continue
+                summary = res.get('summary') or {}
+                if isinstance(summary, dict) and summary.get('has_errors'):
+                    error_instances.append(res)
+
         if error_instances:
             recommendations.append(f"{len(error_instances)}件の異常データが検出されました。詳細分析が必要です。")
 
@@ -417,7 +447,7 @@ class Orchestrator:
                 report_content = self._generate_simple_report(integrated_results)
 
             # レポート保存
-            report_dir = self.output_base_dir
+            report_dir = self.output_base_dir / 'summary'
             report_dir.mkdir(parents=True, exist_ok=True)
             report_path = report_dir / 'summary.md'
 

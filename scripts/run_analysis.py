@@ -30,8 +30,10 @@ def main():
                        help='分析対象のアルゴリズム出力ID')
     parser.add_argument('--evaluation-result-id', '-e', type=int, default=None,
                        help='分析対象の評価結果ID (evaluation_result_table)')
-    parser.add_argument('--verbose', '-v', action='store_true',
+    parser.add_argument('--verbose', '-v', action='store_true',\
                        help='詳細なログ出力')
+    parser.add_argument('--max-instances', type=int, default=None,\
+                       help='個別課題分析に使用する最大インスタンス数（テスト用）')
 
     args = parser.parse_args()
 
@@ -46,9 +48,12 @@ def main():
         print("AI分析エンジンを開始します...")
         # 優先度: evaluation_result_id が指定されていればそれを使用
         if args.evaluation_result_id is not None:
-            result = orchestrator.run_analysis_by_evaluation_result(args.evaluation_result_id)
+            result = orchestrator.run_analysis_by_evaluation_result(
+                args.evaluation_result_id,
+                max_instances=args.max_instances,
+            )
         else:
-            result = orchestrator.run_analysis(args.algorithm_output_id)
+            result = orchestrator.run_analysis(args.algorithm_output_id, max_instances=args.max_instances)
 
         if result['status'] == 'success':
             print("[OK] 分析が正常に完了しました")

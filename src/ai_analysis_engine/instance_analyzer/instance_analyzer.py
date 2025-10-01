@@ -4,13 +4,15 @@ Compatibility adapter for the legacy InstanceAnalyzer API.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from ..config.settings import Settings
-from .utils.file_utils import ensure_directory, ensure_analysis_output_structure
+from .config import config
+from .utils.file_utils import ensure_directory, ensure_analysis_output_structure, get_report_paths
 from .utils.logger import update_instance_log_file
 from .config.library_config import AnalysisConfig
 from .library_api import AIAnalysisEngine
@@ -29,10 +31,14 @@ class InstanceAnalyzer:
 
     def set_output_base_dir(self, base_dir: Path) -> None:
         self.output_base_dir = Path(base_dir)
-        structure = ensure_analysis_output_structure(self.output_base_dir)
-        update_instance_log_file(structure["logs"] / "instance_analysis.log")
+        # Update global config output directory so downstream utilities use the run-specific path
+        config.output_dir = self.output_base_dir
+        get_report_paths(self.output_base_dir, "summary")
+        summary_logs = self.output_base_dir / "summary" / "instance_analysis.log"
+        ensure_directory(str(summary_logs.parent))
+        update_instance_log_file(summary_logs)
 
-    def analyze_instances(self, evaluation_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def analyze_instances(self, evaluation_data: Dict[str, Any], max_instances: Optional[int] = None) -> List[Dict[str, Any]]:
         logger.info("Starting legacy instance analysis via adapter")
         logger.info(f"evaluation_data keys: {list(evaluation_data.keys()) if evaluation_data else 'None'}")
         self._ensure_engine_initialized()
@@ -207,6 +213,16 @@ class InstanceAnalyzer:
                 raise ValueError("dataset_ids length must match algorithm_outputs length")
             dataset_ids_resolved = dataset_ids
 
+        if max_instances is not None and max_instances > 0:
+            algorithm_outputs = algorithm_outputs[:max_instances]
+            core_outputs = core_outputs[:max_instances]
+            expected_results = expected_results[:max_instances]
+            dataset_ids_resolved = dataset_ids_resolved[:max_instances]
+            evaluation_intervals = evaluation_intervals[:max_instances]
+
+            if hasattr(evaluation_data, "update"):
+                evaluation_data["dataset_ids"] = dataset_ids_resolved
+
         results = self._engine.analyze(
             algorithm_outputs=algorithm_outputs,
             core_outputs=core_outputs,
@@ -218,7 +234,37 @@ class InstanceAnalyzer:
             evaluation_intervals=evaluation_intervals,
         )
 
-        return [result.model_dump() for result in results]
+        serialized_results = []
+        for result in results:
+            data = result.model_dump() if hasattr(result, "model_dump") else result
+            metadata = data.get("metadata") or {}
+
+            dataset_id = data.get("dataset_id") or (data.get("dataset") or {}).get("id")
+            report_name = f"report_{dataset_id}" if dataset_id else "report"
+            paths = get_report_paths(self.output_base_dir, report_name)
+
+            context_blob = metadata.get("langgraph_memory")
+            if context_blob:
+                context_file = paths["contexts"] / f"graph_state_{dataset_id or 'unknown'}.json"
+                try:
+                    write_file(str(context_file), json.dumps(context_blob, ensure_ascii=False, indent=2))
+                    self.logger.info(f"LangGraph context saved: {context_file}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to save LangGraph context for {dataset_id}: {e}")
+
+            log_entries = metadata.get("log_buffer")
+            if log_entries:
+                log_file = paths["logs"] / "analysis.log"
+                try:
+                    log_text = "\n".join(str(entry) for entry in log_entries)
+                    with open(log_file, "a", encoding="utf-8") as lp:
+                        lp.write(log_text + "\n")
+                except Exception as e:
+                    self.logger.warning(f"Failed to append logs for {dataset_id}: {e}")
+
+            serialized_results.append(data)
+
+        return serialized_results
 
     def _ensure_engine_initialized(self) -> None:
         if self._initialized:

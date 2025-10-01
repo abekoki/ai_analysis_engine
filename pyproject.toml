@@ -25,7 +25,7 @@ dependencies = [
     "langchain-core>=0.3.0",
     "langgraph>=0.2.0",
     "faiss-cpu>=1.7.4",
-    "datawarehouse @ git+https://github.com/abekoki/DataWareHouse@remake_pip_lib"
+    "datawarehouse",
 ]
 
 [project.optional-dependencies]
@@ -58,3 +58,6 @@ dev-dependencies = [
     "black>=23.0.0",
     "mypy>=1.0.0"
 ]
+
+[tool.uv.sources]
+datawarehouse = { git = "https://github.com/abekoki/DataWareHouse" }

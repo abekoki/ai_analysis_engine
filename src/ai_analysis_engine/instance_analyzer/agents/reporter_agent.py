@@ -2,7 +2,7 @@
 Reporter Agent - Generates final analysis reports
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pathlib import Path
@@ -18,8 +18,9 @@ from ..utils.file_utils import (
     encode_file_to_base64,
     ensure_analysis_output_structure,
     filter_dataframe_by_interval,
-    get_dataset_output_dirs,
+    get_report_paths,
 )
+from ..utils.exploration_utils import extract_thresholds_with_llm
 from ..models.state import DatasetInfo
 from ..models.types import Hypothesis
 from ..tools.repl_tool import REPLTool
@@ -613,17 +614,24 @@ class ReporterAgent:
 
             # Create plots directory in the same location as reports
             structure = ensure_analysis_output_structure(config.output_dir)
-            dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset.id)
-            plots_dir = dataset_dirs["images"]
+            dataset_paths = get_report_paths(config.output_dir, f"report_{dataset.id}")
+            plots_dir = dataset_paths["images"]
             plots_dir.mkdir(parents=True, exist_ok=True)
 
             algorithm_df = pd.read_csv(dataset.algorithm_output_csv)
             core_df = pd.read_csv(dataset.core_output_csv)
-            interval = dataset.data_summary.get("evaluation_interval", {}) if isinstance(dataset.data_summary, dict) else {}
+
+            interval = {}
+            if dataset and getattr(dataset, "evaluation_interval", None):
+                interval = dataset.evaluation_interval
+            elif isinstance(dataset.data_summary, dict):
+                interval = dataset.data_summary.get("evaluation_interval", {})
+
             filtered_algo_df = filter_dataframe_by_interval(algorithm_df, interval)
             filtered_core_df = filter_dataframe_by_interval(core_df, interval)
 
             algo_plot_path = plots_dir / "algorithm_output_plot.png"
+            context = {"df": filtered_algo_df}
             self._generate_algorithm_output_plot(filtered_algo_df, algorithm_config, algo_plot_path, dataset)
 
             core_plot_path = plots_dir / "core_output_plot.png"
@@ -724,303 +732,256 @@ x軸に適した列の基準:
             logger.error(f"Error inferring x-axis column: {e}")
             return ""
 
-    def _generate_algorithm_output_plot(self, df: pd.DataFrame, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
+    def _generate_algorithm_output_plot(
+        self,
+        df: pd.DataFrame,
+        algorithm_config: "AlgorithmConfig",
+        output_path: Path,
+        dataset: DatasetInfo = None,
+    ) -> None:
         """Generate plot for algorithm output data with thresholds"""
-        try:
-            # Get column mapping from dataset
-            column_mapping = {}
-            if dataset and hasattr(dataset, 'data_summary') and dataset.data_summary:
-                column_mapping = dataset.data_summary.get('column_mapping', {}).get('column_mapping', {})
+        column_mapping: Dict[str, Any] = {}
+        if dataset and getattr(dataset, "data_summary", None):
+            column_mapping = (
+                dataset.data_summary.get("column_mapping", {})
+                .get("column_mapping", {})
+            )
 
-            # Extract threshold information outside f-string
-            thresholds_code = ""
-            if hasattr(algorithm_config, 'thresholds') and algorithm_config.thresholds:
-                thresholds_list = []
-                for threshold_name, threshold_value in algorithm_config.thresholds.items():
-                    thresholds_list.append(f"('{threshold_name}', {threshold_value})")
-                thresholds_code = f"thresholds = [{', '.join(thresholds_list)}]"
-            else:
-                thresholds_code = "thresholds = []"
+        spec_context = self._collect_spec_context(dataset, algorithm_config)
+        thresholds_map = self._build_thresholds_from_mapping_or_config(
+            column_mapping,
+            algorithm_config,
+            spec_context,
+            df,
+        )
 
-            # Determine columns to plot based on column mapping
-            plot_columns_code = ""
-            plot_columns = []
+        if column_mapping and column_mapping.get("output"):
+            mapped_columns = [
+                c for c in column_mapping["output"].values() if c
+            ]
+            logger.info(
+                "Algorithm output plot - using mapped columns from specs: %s",
+                mapped_columns,
+            )
+            self._render_and_execute_algorithm_plot(
+                df=df,
+                output_path=output_path,
+                plot_columns=mapped_columns,
+                thresholds_map=thresholds_map,
+                spec_context=spec_context,
+                dataset=dataset,
+                algorithm_config=algorithm_config,
+            )
+            return
 
-            # Priority 1: Use column mapping from specs
-            if column_mapping and 'output' in column_mapping and column_mapping['output']:
-                output_cols = [mapped_col for mapped_col in column_mapping['output'].values() if mapped_col]
-                if output_cols:
-                    plot_columns_code = f"plot_columns = {output_cols}"
-                    plot_columns = output_cols
-                    logger.info(f"Algorithm output plot - using mapped columns from specs: {plot_columns}")
+        errors: List[str] = []
+        for attempt in range(1, 4):
+            candidate_columns = self._infer_plot_columns_with_llm(
+                columns=df.columns.tolist(),
+                spec_context=spec_context,
+                kind="output",
+                attempt=attempt,
+                previous_errors=errors,
+            )
+            logger.info(
+                "Algorithm output plot - inferred columns (attempt %s): %s",
+                attempt,
+                candidate_columns,
+            )
 
-            # Priority 2: Use algorithm config output columns
-            elif hasattr(algorithm_config, 'output_columns') and algorithm_config.output_columns:
-                output_cols = [col for col in algorithm_config.output_columns if col]
-                if output_cols:
-                    plot_columns_code = f"plot_columns = {output_cols}"
-                    plot_columns = output_cols
-                    logger.info(f"Algorithm output plot - using config columns: {plot_columns}")
+            try:
+                self._render_and_execute_algorithm_plot(
+                    df=df,
+                    output_path=output_path,
+                    plot_columns=candidate_columns,
+                    thresholds_map=thresholds_map,
+                    spec_context=spec_context,
+                    dataset=dataset,
+                    algorithm_config=algorithm_config,
+                )
+                return
+            except Exception as exc:
+                error_text = str(exc)
+                logger.error(
+                    "Failed to generate algorithm output plot (attempt %s): %s",
+                    attempt,
+                    error_text,
+                )
+                errors.append(error_text)
 
-            # Priority 3: Extract from spec using RAG keywords
-            else:
-                relevant_keywords = self._extract_relevant_keywords_from_specs(dataset, algorithm_config)
-                if relevant_keywords:
-                    try:
-                        matched_cols = [col for col in df.columns if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
-                        if matched_cols:
-                            plot_columns_code = f"plot_columns = {matched_cols[:4]}"
-                            plot_columns = matched_cols[:4]
-                            logger.info(f"Algorithm output plot - using RAG-matched columns: {plot_columns}")
-                        else:
-                            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                            keyword_matched_numeric = [col for col in numeric_cols if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
-                            if keyword_matched_numeric:
-                                plot_columns_code = f"plot_columns = {keyword_matched_numeric[:4]}"
-                                plot_columns = keyword_matched_numeric[:4]
-                                logger.info(f"Algorithm output plot - using keyword-matched numeric columns: {plot_columns}")
-                    except Exception as e:
-                        logger.warning(f"Failed to identify columns for algorithm plot: {e}")
+        raise RuntimeError("Algorithm plot generation failed after multiple attempts")
 
-            # Last resort: use numeric columns
-            if not plot_columns:
-                try:
-                    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                    if numeric_cols:
-                        plot_columns_code = f"plot_columns = {numeric_cols[:4]}"
-                        plot_columns = numeric_cols[:4]
-                        logger.info(f"Algorithm output plot - fallback to numeric columns: {plot_columns}")
-                except Exception as e:
-                    logger.warning(f"Failed to determine numeric columns: {e}")
-                    plot_columns_code = "plot_columns = ['column1', 'column2']"
-                    plot_columns = ['column1', 'column2']
+    def _render_and_execute_algorithm_plot(
+        self,
+        df: pd.DataFrame,
+        output_path: Path,
+        plot_columns: List[str],
+        thresholds_map: Dict[str, float],
+        spec_context: str,
+        dataset: DatasetInfo,
+        algorithm_config: "AlgorithmConfig",
+    ) -> None:
+        if not plot_columns:
+            raise ValueError("Inferred plot columns not found in dataframe columns")
 
-            logger.info(f"Algorithm output plot - final columns: {plot_columns}")
+        x_axis_column = self._infer_x_axis_column(
+            list(df.columns), spec_context, algorithm_config
+        )
+        target_interval_code, start_frame, end_frame = self._build_target_interval_code(
+            dataset
+        )
 
-            # Log final columns used for plotting and analysis
-            logger.info(f"PLOT_COLUMNS_USED - Algorithm: {plot_columns}")
+        plot_code = self._render_algorithm_plot_code(
+            output_path=output_path,
+            plot_columns=plot_columns,
+            x_axis_column=x_axis_column,
+            target_interval_code=target_interval_code,
+            start_frame=start_frame,
+            end_frame=end_frame,
+            thresholds_map=thresholds_map,
+        )
 
-            # Infer x-axis column using LLM
-            spec_content = ""
-            if dataset and hasattr(dataset, 'algorithm_spec_md') and dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        spec_content = f.read()[:1000]  # Limit content for LLM
-                except Exception as e:
-                    logger.warning(f"Failed to load spec for x-axis inference: {e}")
+        result = self.repl_tool.execute_code(plot_code, {"df": df})
+        if not result.get("success"):
+            error_msg = result.get("error") or "Unknown error"
+            logger.error(
+                "Plot code snippet around error:\n%s",
+                plot_code[-500:],
+            )
+            raise RuntimeError(error_msg)
 
-            x_axis_column = self._infer_x_axis_column(list(df.columns), spec_content, algorithm_config)
-            if x_axis_column:
-                logger.info(f"Using inferred x-axis column for algorithm plot: {x_axis_column}")
-            else:
-                logger.info("No suitable x-axis column found, using default")
+        logger.info("Generated algorithm output plot: %s", output_path)
 
-            # Extract target interval from dataset if available
-            target_interval_code = ""
-            start_frame = None
-            end_frame = None
-
-            # First, try to get from consistency_check
-            if dataset and hasattr(dataset, 'consistency_check') and dataset.consistency_check:
-                cc = dataset.consistency_check
-                if isinstance(cc, dict) and 'target_interval' in cc and cc['target_interval']:
-                    interval = cc['target_interval']
-                    start_frame = interval.get('start')
-                    end_frame = interval.get('end')
-
-            # If not found in consistency_check, extract from expected_result using LLM
-            if start_frame is None and dataset and hasattr(dataset, 'expected_result'):
-                expected = dataset.expected_result
-                # Extract frame range from expected result using LLM
-                start_frame, end_frame = self._extract_frame_interval_with_llm(expected)
-
-            if start_frame is not None and end_frame is not None:
-                target_interval_code = f"""
-# Filter data to target interval
-if 'frame' in df.columns:
-    df = df[(df['frame'] >= {start_frame}) & (df['frame'] <= {end_frame})]
-elif 'frame_num' in df.columns:
-    df = df[(df['frame_num'] >= {start_frame}) & (df['frame_num'] <= {end_frame})]
-# Reset index after filtering
-df = df.reset_index(drop=True)
-"""
-
-            # Create plot generation code
-            plot_code = f"""
+    def _render_algorithm_plot_code(
+        self,
+        output_path: Path,
+        plot_columns: List[str],
+        x_axis_column: str,
+        target_interval_code: str,
+        start_frame: Optional[int],
+        end_frame: Optional[int],
+        thresholds_map: Dict[str, float],
+    ) -> str:
+        return f"""
 import matplotlib.pyplot as plt
 
-x_axis_column = '{x_axis_column}'
-output_path = r'{str(output_path)}'
-
-df = df.copy()
+filtered_df = df.copy()
 
 {target_interval_code}
 
-start_frame_val = {start_frame if start_frame is not None else 'None'}
-end_frame_val = {end_frame if start_frame is not None else 'None'}
+plot_columns = {plot_columns}
+thresholds_map = {thresholds_map}
 
-{thresholds_code}
-{plot_columns_code}
-
-plot_cols = [col for col in plot_columns if col in df.columns]
+plot_cols = [col for col in plot_columns if col in filtered_df.columns]
 if not plot_cols:
-    plot_cols = df.columns[:min(5, len(df.columns))]
+    raise ValueError('Provided plot columns not found in dataframe')
 
 fig, axes = plt.subplots(len(plot_cols), 1, figsize=(12, 4*len(plot_cols)))
 if len(plot_cols) == 1:
     axes = [axes]
 
-x_data = df.index
+x_data = filtered_df.index
 x_label = 'Index'
-if x_axis_column and x_axis_column in df.columns:
-    x_data = df[x_axis_column]
-    x_label = x_axis_column.replace('_', ' ').title()
+if '{x_axis_column}' and '{x_axis_column}' in filtered_df.columns:
+    x_data = filtered_df['{x_axis_column}']
+    x_label = '{x_axis_column}'.replace('_', ' ').title()
 else:
-    for col in ['frame', 'frame_num', 'timestamp', 'time']:
-        if col in df.columns:
-            x_data = df[col]
+    for col in filtered_df.columns:
+        if col.lower() in ['frame', 'frame_num', 'timestamp', 'time']:
+            x_data = filtered_df[col]
             x_label = col.replace('_', ' ').title()
             break
 
 for i, col in enumerate(plot_cols):
-    axes[i].plot(x_data, df[col], label=col, linewidth=2)
+    axes[i].plot(x_data, filtered_df[col], linewidth=2, label=col)
 
-    for threshold_name, threshold_value in thresholds:
-        if threshold_name.lower().replace('_threshold', '').replace('_', '') in col.lower():
-            label_text = threshold_name + ': ' + str(threshold_value)
-            axes[i].axhline(y=threshold_value, color='red', linestyle='--', label=label_text)
+    for label, value in thresholds_map.items():
+        normalized = label.lower().replace('_threshold', '').replace('threshold', '').replace('_', '')
+        if normalized and normalized in col.lower():
+            axes[i].axhline(y=value, color='red', linestyle='--', label=f"{{label}}: {{value}}")
 
-    axes[i].set_title(col + ' - Algorithm Output')
+    axes[i].set_title(col)
     axes[i].set_xlabel(x_label)
     axes[i].set_ylabel('Value')
     axes[i].legend()
     axes[i].grid(True, alpha=0.3)
 
 plt.tight_layout()
-plt.savefig(output_path, dpi=150, bbox_inches='tight')
+plt.savefig(r'{output_path}', dpi=150, bbox_inches='tight')
 plt.close()
 """
 
+    def _build_thresholds_from_mapping_or_config(
+        self,
+        column_mapping: Dict[str, Any],
+        algorithm_config: 'AlgorithmConfig',
+        spec_context: str,
+        df: pd.DataFrame,
+    ) -> Dict[str, float]:
+        thresholds_map: Dict[str, float] = {}
 
-            # Execute plot generation
-            result = self.repl_tool.execute_code(plot_code)
-            if result.get('success'):
-                logger.info(f"Generated algorithm output plot: {output_path}")
-            else:
-                logger.error(f"Failed to generate algorithm output plot: {result.get('error')}")
-                logger.error(f"Plot code snippet around error:\n{plot_code[-500:]}")
+        # Prefer explicit mapping from prior analysis
+        if column_mapping and column_mapping.get('thresholds'):
+            thresholds_map.update(column_mapping['thresholds'])
 
-        except Exception as e:
-            logger.error(f"Error generating algorithm output plot: {e}")
+        # Use algorithm config if still missing
+        if not thresholds_map and hasattr(algorithm_config, 'thresholds') and algorithm_config.thresholds:
+            thresholds_map.update(algorithm_config.thresholds)
 
-    def _generate_core_output_plot(self, df: pd.DataFrame, algorithm_config: 'AlgorithmConfig', output_path: Path, dataset: DatasetInfo = None):
-        """Generate plot for core output data with thresholds"""
-        try:
-            # Get column mapping from dataset
-            column_mapping = {}
-            if dataset and hasattr(dataset, 'data_summary') and dataset.data_summary:
-                column_mapping = dataset.data_summary.get('column_mapping', {}).get('column_mapping', {})
+        # RAG extract from spec when thresholds still absent
+        if not thresholds_map and spec_context:
+            try:
+                extracted = extract_thresholds_with_llm(spec_context)
+                if extracted:
+                    thresholds_map.update(extracted)
+            except Exception as exc:
+                logger.warning(f"Threshold extraction via LLM failed: {exc}")
 
-            # Determine input columns to plot with multiple strategies
-            input_cols = []
+        # Filter to numeric values and standardize names
+        cleaned: Dict[str, float] = {}
+        for name, value in thresholds_map.items():
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                continue
+            normalized = name.strip()
+            if not normalized:
+                continue
 
-            # Priority 1: Use column mapping from specs
-            if column_mapping and 'input' in column_mapping and column_mapping['input']:
-                input_cols = [mapped_col for mapped_col in column_mapping['input'].values() if mapped_col]
-                logger.info(f"Core output plot - using mapped input columns from specs: {input_cols}")
+            alias_tokens = normalized.lower().replace('_threshold', '').replace('threshold', '').split('_')
+            alias_tokens = [token for token in alias_tokens if token]
 
-            # Priority 2: Use algorithm config input columns
-            elif hasattr(algorithm_config, 'input_columns') and algorithm_config.input_columns:
-                input_cols = algorithm_config.input_columns
-                logger.info(f"Core output plot - using config input columns: {input_cols}")
+            related_columns = [col for col in df.columns if all(token in col.lower() for token in alias_tokens)]
+            if related_columns:
+                cleaned[normalized] = numeric_value
 
-            # Priority 3: Extract from spec using RAG keywords
-            else:
-                relevant_keywords = self._extract_relevant_keywords_from_specs(dataset, algorithm_config)
-                if relevant_keywords:
-                    try:
-                        matched_cols = [col for col in df.columns if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
-                        if matched_cols:
-                            input_cols = matched_cols[:6]  # Limit to 6 columns for core plots
-                            logger.info(f"Core output plot - using RAG-matched columns: {input_cols}")
-                        else:
-                            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                            keyword_matched_numeric = [col for col in numeric_cols if any(keyword.lower() in col.lower() for keyword in relevant_keywords)]
-                            if keyword_matched_numeric:
-                                input_cols = keyword_matched_numeric[:6]
-                                logger.info(f"Core output plot - using keyword-matched numeric columns: {input_cols}")
-                    except Exception as e:
-                        logger.warning(f"Failed to identify columns for core plot: {e}")
+        return cleaned
 
-            # Last resort: use numeric columns
-            if not input_cols:
-                try:
-                    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                    if numeric_cols:
-                        # Prefer common eye-tracking columns
-                        preferred_cols = [col for col in numeric_cols if any(term in col.lower() for term in ['confidence', 'openness', 'leye', 'reye', 'face'])]
-                        input_cols = (preferred_cols + numeric_cols)[:6]  # Combine preferred and others
-                        logger.info(f"Core output plot - fallback to numeric columns: {input_cols}")
-                except Exception as e:
-                    logger.warning(f"Failed to determine numeric columns for core plot: {e}")
-                    input_cols = ['face_confidence', 'leye_openness', 'reye_openness']
+    def _build_thresholds_code(self, algorithm_config: 'AlgorithmConfig') -> str:
+        if hasattr(algorithm_config, 'thresholds') and algorithm_config.thresholds:
+            thresholds_list = [
+                f"('{name}', {value})" for name, value in algorithm_config.thresholds.items()
+            ]
+            return f"thresholds = [{', '.join(thresholds_list)}]"
+        return "thresholds = []"
 
-            input_cols_str = str(input_cols)
-            logger.info(f"Core output plot - final input columns: {input_cols}")
+    def _build_target_interval_code(
+        self,
+        dataset: Optional[DatasetInfo],
+    ) -> Tuple[str, Optional[int], Optional[int]]:
+        target_interval_code = ""
+        start_frame: Optional[int] = None
+        end_frame: Optional[int] = None
 
-            # Log final columns used for plotting and analysis
-            logger.info(f"PLOT_COLUMNS_USED - Core: {input_cols}")
-
-            # Infer x-axis column using LLM for core plot
-            spec_content = ""
-            if dataset and hasattr(dataset, 'algorithm_spec_md') and dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        spec_content = f.read()[:1000]  # Limit content for LLM
-                except Exception as e:
-                    logger.warning(f"Failed to load spec for core plot x-axis inference: {e}")
-
-            x_axis_column = self._infer_x_axis_column(list(df.columns), spec_content, algorithm_config)
-            if x_axis_column:
-                logger.info(f"Using inferred x-axis column for core plot: {x_axis_column}")
-            else:
-                logger.info("No suitable x-axis column found for core plot, using default")
-
-            thresholds_code = ""
-            if column_mapping and 'thresholds' in column_mapping:
-                # Use thresholds from column mapping
-                thresholds_list = []
-                for threshold_name, threshold_value in column_mapping['thresholds'].items():
-                    thresholds_list.append(f"('{threshold_name}', {threshold_value})")
-                thresholds_code = f"thresholds = [{', '.join(thresholds_list)}]"
-            elif hasattr(algorithm_config, 'thresholds') and algorithm_config.thresholds:
-                thresholds_list = []
-                for threshold_name, threshold_value in algorithm_config.thresholds.items():
-                    thresholds_list.append(f"('{threshold_name}', {threshold_value})")
-                thresholds_code = f"thresholds = [{', '.join(thresholds_list)}]"
-            else:
-                thresholds_code = "thresholds = []"
-
-            # Extract relevant keywords from specifications for dynamic column selection
-            relevant_keywords = self._extract_relevant_keywords_from_specs(dataset, algorithm_config)
-
-            # Extract target interval from dataset if available
-            target_interval_code = ""
-            start_frame = None
-            end_frame = None
-
-            # First, try to get from consistency_check
-            if dataset and hasattr(dataset, 'consistency_check') and dataset.consistency_check:
-                cc = dataset.consistency_check
-                if isinstance(cc, dict) and 'target_interval' in cc and cc['target_interval']:
+        if dataset and getattr(dataset, 'consistency_check', None):
+            cc = dataset.consistency_check
+            if isinstance(cc, dict) and cc.get('target_interval'):
                     interval = cc['target_interval']
                     start_frame = interval.get('start')
                     end_frame = interval.get('end')
 
-            # If not found in consistency_check, extract from expected_result using LLM
             if start_frame is None and dataset and hasattr(dataset, 'expected_result'):
                 expected = dataset.expected_result
-                # Extract frame range from expected result using LLM
                 start_frame, end_frame = self._extract_frame_interval_with_llm(expected)
 
             if start_frame is not None and end_frame is not None:
@@ -1034,137 +995,86 @@ elif 'frame_num' in df.columns:
 df = df.reset_index(drop=True)
 """
 
-            # Create plot generation code
-            plot_code = f"""
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
+        return target_interval_code, start_frame, end_frame
 
-# X-axis column configuration
-x_axis_column = '{x_axis_column}'
+    def _generate_core_output_plot(
+        self,
+        df: pd.DataFrame,
+        algorithm_config: 'AlgorithmConfig',
+        output_path: Path,
+        dataset: DatasetInfo = None,
+    ) -> None:
+        """Generate plot for core output data with thresholds"""
+        column_mapping: Dict[str, Any] = {}
+        if dataset and hasattr(dataset, 'data_summary') and dataset.data_summary:
+            column_mapping = (
+                dataset.data_summary.get('column_mapping', {})
+                .get('column_mapping', {})
+            )
 
-# Output path configuration
-output_path = r'{str(output_path)}'
+        spec_context = self._collect_spec_context(dataset, algorithm_config)
+        threshold_map = self._build_thresholds_from_mapping_or_config(
+            column_mapping,
+            algorithm_config,
+            spec_context,
+            df,
+        )
 
-# Load data
-df = pd.read_csv(r'{dataset.core_output_csv}') # Use provided df
+        if column_mapping and column_mapping.get('input'):
+            mapped_inputs = [
+                col for col in column_mapping['input'].values() if col
+            ]
+            logger.info(
+                "Core output plot - using mapped input columns from specs: %s",
+                mapped_inputs,
+            )
+            self._render_and_execute_algorithm_plot(
+                df=df,
+                output_path=output_path,
+                plot_columns=mapped_inputs,
+                thresholds_map=threshold_map,
+                spec_context=spec_context,
+                dataset=dataset,
+                algorithm_config=algorithm_config,
+            )
+            return
 
-# Filter to target interval if available
-{target_interval_code}
+        errors: List[str] = []
+        for attempt in range(1, 4):
+            inferred_inputs = self._infer_plot_columns_with_llm(
+                columns=df.columns.tolist(),
+                spec_context=spec_context,
+                kind="input",
+                attempt=attempt,
+                previous_errors=errors,
+            )
+            logger.info(
+                "Core output plot - inferred input columns (attempt %s): %s",
+                attempt,
+                inferred_inputs,
+            )
 
-# Define frame range variables for axis limits
-start_frame_val = {start_frame if start_frame is not None else 'None'}
-end_frame_val = {end_frame if start_frame is not None else 'None'}
+            try:
+                self._render_and_execute_algorithm_plot(
+                    df=df,
+                    output_path=output_path,
+                    plot_columns=inferred_inputs,
+                    thresholds_map=threshold_map,
+                    spec_context=spec_context,
+                    dataset=dataset,
+                    algorithm_config=algorithm_config,
+                )
+                return
+            except Exception as exc:
+                error_text = str(exc)
+                logger.error(
+                    "Failed to generate core output plot (attempt %s): %s",
+                    attempt,
+                    error_text,
+                )
+                errors.append(error_text)
 
-# Input columns and thresholds configuration
-input_cols = {input_cols_str}
-relevant_keywords = {relevant_keywords}
-{thresholds_code}
-
-# Determine columns to plot from input columns with keyword prioritization
-plot_cols = []
-if input_cols:
-    # Prioritize columns based on extracted keywords
-    if relevant_keywords:
-        prioritized_cols = []
-        other_cols = []
-
-        for col in input_cols:
-            if col in df.columns:
-                col_lower = col.lower()
-                if any(keyword in col_lower for keyword in relevant_keywords):
-                    prioritized_cols.append(col)
-                else:
-                    other_cols.append(col)
-
-        # Combine prioritized and other columns
-        plot_cols = prioritized_cols + other_cols[:max(0, 6 - len(prioritized_cols))]
-    else:
-        plot_cols = [col for col in input_cols if col in df.columns][:6]
-
-# If no input columns specified or none exist, determine columns dynamically based on data types and threshold names
-if not plot_cols:
-    # First, try to find columns that match threshold names
-    threshold_base_names = []
-    for threshold_name in thresholds:
-        base_name = threshold_name[0].lower().replace('_threshold', '').replace('_', '')
-        threshold_base_names.append(base_name)
-
-    # Look for columns that match threshold names
-    for col in df.columns:
-        col_lower = col.lower()
-        if any(base_name in col_lower for base_name in threshold_base_names):
-            plot_cols.append(col)
-
-    # If still no matches, look for numeric columns (likely to be features)
-    if not plot_cols:
-        for col in df.columns:
-            if df[col].dtype in ['int64', 'float64'] and col.lower() not in ['frame', 'index', 'timestamp']:
-                plot_cols.append(col)
-                if len(plot_cols) >= 6:  # Limit to 6 columns max
-                    break
-
-# If still no columns, use first few numeric columns
-if not plot_cols:
-    for col in df.columns:
-        if df[col].dtype in ['int64', 'float64']:
-            plot_cols.append(col)
-            if len(plot_cols) >= 6:  # Limit to 6 columns max
-                break
-
-# Ensure we have at least one column to plot
-if len(plot_cols) == 0:
-    print("No columns available for plotting")
-else:
-    fig, axes = plt.subplots(len(plot_cols), 1, figsize=(12, 4*len(plot_cols)))
-    if len(plot_cols) == 1:
-        axes = [axes]
-
-    # Determine x-axis data using inferred column
-    x_data = df.index
-    x_label = 'Index'
-    if x_axis_column and x_axis_column in df.columns:
-        x_data = df[x_axis_column]
-        x_label = x_axis_column.replace('_', ' ').title()
-    else:
-        # Fallback to common patterns
-        for col in ['frame', 'frame_num', 'timestamp', 'time']:
-            if col in df.columns:
-                x_data = df[col]
-                x_label = col.replace('_', ' ').title()
-                break
-
-    # Plot each input column with thresholds
-    for i, col in enumerate(plot_cols):
-        axes[i].plot(x_data, df[col], label=col, linewidth=2)
-
-        # Add threshold lines if available and column matches threshold
-        for threshold_name, threshold_value in thresholds:
-            # Apply threshold if column name matches threshold name (case-insensitive partial match)
-            if threshold_name.lower().replace('_threshold', '').replace('_', '') in col.lower():
-                label_text = threshold_name + ': ' + str(threshold_value)
-                axes[i].axhline(y=threshold_value, color='red', linestyle='--', label=label_text)
-
-        axes[i].set_title(col + ' - Core Input Feature')
-        axes[i].set_xlabel(x_label)
-        axes[i].set_ylabel('Value')
-        axes[i].legend()
-        axes[i].grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    plt.close()
-"""
-
-            # Execute plot generation
-            result = self.repl_tool.execute_code(plot_code)
-            if result.get('success'):
-                logger.info(f"Generated core output plot: {output_path}")
-            else:
-                logger.error(f"Failed to generate core output plot: {result.get('error')}")
-
-        except Exception as e:
-            logger.error(f"Error generating core output plot: {e}")
+        raise RuntimeError("Core plot generation failed after multiple attempts")
 
     def _load_algorithm_config(self, dataset: DatasetInfo):
         """
@@ -1428,19 +1338,19 @@ plt.tight_layout()
         analysis_summary = self._summarize_analysis_results(analysis_results)
         hypotheses_summary = self._summarize_hypotheses(hypotheses)
 
-        dataset_dirs = get_dataset_output_dirs(config.output_dir, dataset.id)
+        dataset_dirs = get_report_paths(config.output_dir, f"report_{dataset.id}")
         algorithm_plot_link = ""
         core_plot_link = ""
         algorithm_plot_b64 = ""
         core_plot_b64 = ""
 
         if plot_files.get("algorithm"):
-            algorithm_plot_link = f"../images/{dataset.id}/{plot_files['algorithm']}"
+            algorithm_plot_link = f"images/{plot_files['algorithm']}"
             algorithm_plot_path = dataset_dirs["images"] / plot_files["algorithm"]
             algorithm_plot_b64 = encode_file_to_base64(algorithm_plot_path)
 
         if plot_files.get("core"):
-            core_plot_link = f"../images/{dataset.id}/{plot_files['core']}"
+            core_plot_link = f"images/{plot_files['core']}"
             core_plot_path = dataset_dirs["images"] / plot_files["core"]
             core_plot_b64 = encode_file_to_base64(core_plot_path)
 
@@ -1457,3 +1367,71 @@ plt.tight_layout()
             "evaluation_interval": interval_line,
             **algorithm_context,
         }
+
+    def _collect_spec_context(self, dataset: DatasetInfo, algorithm_config: 'AlgorithmConfig') -> str:
+        spec_content = ""
+        if dataset:
+            if hasattr(dataset, 'algorithm_spec_md') and dataset.algorithm_spec_md:
+                try:
+                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
+                        spec_content += f.read()[:2000]
+                except Exception as ex:
+                    logger.warning(f"Failed to load algorithm spec: {ex}")
+            if hasattr(dataset, 'evaluation_spec_md') and dataset.evaluation_spec_md:
+                try:
+                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
+                        spec_content += "\n" + f.read()[:2000]
+                except Exception as ex:
+                    logger.warning(f"Failed to load evaluation spec: {ex}")
+
+        if not spec_content and algorithm_config and hasattr(algorithm_config, 'spec_file') and algorithm_config.spec_file:
+            import os
+            if os.path.exists(algorithm_config.spec_file):
+                with open(algorithm_config.spec_file, 'r', encoding='utf-8') as f:
+                    spec_content += f.read()[:2000]
+        return spec_content
+
+    def _infer_plot_columns_with_llm(
+        self,
+        columns: List[str],
+        spec_context: str,
+        kind: str = "output",
+        attempt: int = 1,
+        previous_errors: Optional[List[str]] = None,
+    ) -> List[str]:
+        if not columns:
+            return []
+
+        instruction = "出力" if kind == "output" else "入力"
+        hint_text = "\n".join(previous_errors or [])
+
+        prompt = f"""
+以下の列名リストと仕様情報を参考に、プロットに使用すべき{instruction}指標の列名を最大5件まで推論してください。
+
+利用可能な列名: {columns}
+
+仕様情報:
+{spec_context[:2000] if spec_context else '仕様情報がありません'}
+
+過去の失敗ヒント:
+{hint_text if hint_text else '失敗情報なし'}
+
+要件:
+- 数値列を優先してください。
+- {instruction}結果や性能評価に関連する指標を選んでください。
+- 列名のみカンマ区切りで返してください（例: score,prediction,confidence）。
+- わからない場合は空文字のみ返してください。
+"""
+        try:
+            response = self.llm.invoke(prompt)
+            text = response.content.strip()
+            if not text:
+                return []
+            candidates = [c.strip() for c in text.split(',') if c.strip()]
+            valid_cols = [col for col in candidates if col in columns]
+            if not valid_cols and attempt >= 3:
+                logger.warning("LLM failed to infer valid columns after multiple attempts")
+            return valid_cols
+        except Exception as ex:
+            logger.error(f"LLM column inference failed: {ex}")
+            return []

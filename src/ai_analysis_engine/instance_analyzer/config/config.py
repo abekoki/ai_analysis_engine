@@ -112,7 +112,7 @@ class Config:
         # Project paths
         self.project_root = Path(".")
         self.data_dir = Path("./data")
-        self.output_dir = Path("./output")
+        self.output_dir = Path("./outputs")
         self.logs_dir = Path("./logs")
         self.config_dir = Path("./config")
 

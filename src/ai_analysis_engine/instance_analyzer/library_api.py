@@ -516,8 +516,7 @@ class AIAnalysisEngine:
             dataset = internal_result["datasets"][0]
             if hasattr(dataset, 'report_content') and dataset.report_content:
                 report = dataset.report_content
-                # レポートファイルパスの推定
-                report_path = f"{self.config.output_dir}/results/reports/{dataset_id}_report.md"
+                report_path = f"{self.config.output_dir}/report_{dataset_id}/report_{dataset_id}.md"
             if hasattr(dataset, 'model_dump'):
                 raw_snapshot = dataset.model_dump()
             elif isinstance(dataset, dict):
@@ -526,9 +525,8 @@ class AIAnalysisEngine:
         # プロットの取得
         plots = []
         if "datasets" in internal_result and internal_result["datasets"]:
-            # プロットファイルの検索（簡易実装）
             import glob
-            plot_pattern = f"{self.config.output_dir}/results/reports/plots/{dataset_id}/*.png"
+            plot_pattern = f"{self.config.output_dir}/report_{dataset_id}/images/*.png"
             plots = glob.glob(plot_pattern)
 
         # メトリクスの作成
