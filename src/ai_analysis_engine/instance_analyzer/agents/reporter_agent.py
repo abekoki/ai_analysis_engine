@@ -625,7 +625,7 @@ class ReporterAgent:
             if dataset and getattr(dataset, "evaluation_interval", None):
                 interval = dataset.evaluation_interval
             elif isinstance(dataset.data_summary, dict):
-                interval = dataset.data_summary.get("evaluation_interval", {})
+                interval = dataset.data_summary.get("evaluation_interval", {}) or {}
 
             filtered_algo_df = filter_dataframe_by_interval(algorithm_df, interval)
             filtered_core_df = filter_dataframe_by_interval(core_df, interval)

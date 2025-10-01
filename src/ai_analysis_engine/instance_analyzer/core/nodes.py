@@ -172,9 +172,11 @@ class DataCheckerNode:
             dataframes = self.repl_tool.load_csv_data(csv_files)
             logger.info(f"Loaded {len(dataframes)} dataframes: {list(dataframes.keys())}")
 
-            interval = {}
-            if isinstance(current_dataset.data_summary, dict):
-                interval = current_dataset.data_summary.get("evaluation_interval", {})
+            interval: Dict[str, Any] = {}
+            if getattr(current_dataset, "evaluation_interval", None):
+                interval = current_dataset.evaluation_interval
+            elif isinstance(current_dataset.data_summary, dict):
+                interval = current_dataset.data_summary.get("evaluation_interval", {}) or {}
 
             filtered_dataframes: Dict[str, Any] = {}
             for name, df in dataframes.items():
