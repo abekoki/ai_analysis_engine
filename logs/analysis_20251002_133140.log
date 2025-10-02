@@ -1,0 +1,23 @@
+2025-10-02 13:31:40,201 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 13:31:40,202 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-10-02 13:31:40,234 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 13:31:40,236 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 13:31:40,237 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 13:31:40,237 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 13:31:40,238 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 13:31:40,638 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 13:31:40,638 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-10-02 13:31:41,053 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Instance analysis failed: ('Multiple CSV files found in directory; expected exactly one', {'directory': 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705', 'files': ['C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\1.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\2.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\3.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\4.csv']})
+Traceback (most recent call last):
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 193, in run_analysis_by_evaluation_result
+    instance_results = self.instance_analyzer.analyze_instances(
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\instance_analyzer\instance_analyzer.py", line 61, in analyze_instances
+    csv_path = self._resolve_algorithm_output_csv(algo_data)
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\instance_analyzer\instance_analyzer.py", line 425, in _resolve_algorithm_output_csv
+    return self._resolve_single_csv_within_directory(algo_dir_rel)
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\instance_analyzer\instance_analyzer.py", line 409, in _resolve_single_csv_within_directory
+    raise ValueError(
+ValueError: ('Multiple CSV files found in directory; expected exactly one', {'directory': 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705', 'files': ['C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\1.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\2.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\3.csv', 'C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\4.csv']})
+2025-10-02 13:31:41,068 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_133140\summary\summary.md
+2025-10-02 13:31:41,078 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=68
+2025-10-02 13:31:41,078 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

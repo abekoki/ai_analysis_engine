@@ -1,0 +1,19 @@
+2025-10-02 13:55:21,680 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 13:55:21,680 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 9
+2025-10-02 13:55:21,820 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 13:55:21,821 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 13:55:21,822 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 13:55:21,822 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 13:55:21,823 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 13:55:22,234 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 13:55:22,235 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-10-02 13:55:22,590 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Instance analysis failed: ('Failed to resolve output directories for evaluation row', {'algorithm_output_ID': 51, 'core_lib_output_ID': 14, 'available_algorithm_dirs': [54], 'available_core_dirs': [17]})
+Traceback (most recent call last):
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 193, in run_analysis_by_evaluation_result
+    instance_results = self.instance_analyzer.analyze_instances(
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\instance_analyzer\instance_analyzer.py", line 140, in analyze_instances
+    raise ValueError(
+ValueError: ('Failed to resolve output directories for evaluation row', {'algorithm_output_ID': 51, 'core_lib_output_ID': 14, 'available_algorithm_dirs': [54], 'available_core_dirs': [17]})
+2025-10-02 13:55:22,601 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_135521\summary\summary.md
+2025-10-02 13:55:22,611 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=70
+2025-10-02 13:55:22,611 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

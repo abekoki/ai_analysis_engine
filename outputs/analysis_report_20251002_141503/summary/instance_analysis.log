@@ -1,0 +1,8 @@
+2025-10-02 14:15:03,616 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 14:15:03,617 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 9
+2025-10-02 14:15:03,647 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 14:15:03,648 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 14:15:03,649 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 14:15:03,652 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 14:15:03,652 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 14:15:03,652 - ai_analysis_engine.performance_analyzer.performance_analyzer - INFO - Starting performance analysis

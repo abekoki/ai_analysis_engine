@@ -1,4 +1,23 @@
-# 2025-09-29
+# AI分析エンジン ログ
+
+## 2025-10-02
+
+### 14:15 - 評価ID=9 再解析とレポート画像パス修正
+- 評価ID=9を `--max-instances 1` で再実行し、アルゴリズム出力／コア出力ディレクトリに含まれるCSVの整合性が取れていることを確認。
+- `ReporterAgent` で生成するレポート内のグラフ参照が `images/` になっていた問題を修正し、`viz/` ディレクトリ配下のファイルを確実に参照するようロジックを改善。
+- 修正後の再実行で `report_1_4.md` が `viz/algorithm_output_plot.png` / `viz/core_output_plot.png` を正しく参照していることを確認。
+
+### 13:45 - 評価ID=3向けCSV整合性チェックツール作成
+- `scripts/check_evaluation_outputs.py` を追加し、指定した `evaluation_result_ID` から取得したアルゴリズム出力・コア出力のCSVパスを検証する機能を実装。
+- DataWareHouse APIから `evaluation_data` → `algorithm_output` → `core_lib_output` を辿り、ディレクトリ内CSVの存在有無やvideo_ID一致による候補決定、現行ロジックでの失敗理由を出力。
+- 評価ID=3で実行し、以下の問題を確認：
+  - アルゴリズム出力ディレクトリに複数CSVが存在し、video_IDで一意に決まらないケースがある。
+  - `build_task_level_dataframe` から返却される `algorithm_output_ID` と `core_lib_output_ID` が最新出力のIDと異なる場合があり、ディレクトリ整合が崩れている。
+
+### 12:45 - core_lib_output_ID参照状況の詳細調査
+- `Orchestrator`・`DataLoader`・`scripts/list_targets.py` の呼び出しを追い、`core_lib_output_ID` / `core_lib_output_dir` はDBから正しく取得できていると確認。（略）
+
+## 2025-09-29
 - InstanceAnalyzer 個別課題分析フローの改善項目対応を実施。図生成・代表値算出の評価区間適用、代表値／画像のプロンプト連携、出力ディレクトリ構造統一、LangGraph対話履歴保存、ログ配置変更などを完了。
 - 主な修正: `utils/file_utils.py` に共通ユーティリティ追加、`core/nodes.py` / `agents/reporter_agent.py` でのフィルタリングと統計計算修正、`logger.py` でラン毎ログ設定、`main.py` の成果物書き出し整理、テンプレート更新等。
 - LangGraph MemorySaver を導入し、実行コンテキストを `logs/langgraph_context/` に保存。テンプレート・プロンプトが代表値／画像リンクを参照するよう調整。
@@ -71,10 +90,4 @@
 - 可視化拡張（ROC/PR追加、混同行列の標準化、棒グラフの値ラベル修正）。
 - インスタンス分析フィルタリング追加（課題なしのデータは除外可能）。
 - 実行: `scripts/run_analysis.py -e 3 -v` 正常終了。レポート・図表・JSON生成およびDWH登録完了。
-- 外部仕様参照: `https://github.com/abekoki/drowsy_detection` を `external/drowsy_detection` に取得/更新して参照。
-
-2025-10-01 15:26 作業内容:
-- reporter_agent と core.nodes の `get_report_paths` 呼び出しを `report_<dataset>` に統一し、旧 `dataset_id` ディレクトリの生成を防止
-- `_save_results` を修正して各データセットごとの `analysis_results.json` をレポートディレクトリへ保存するよう変更し、summary 側で集約
-- LangGraph コンテキストおよびログの保存先を `report_<dataset>` 配下に揃え、viz 画像も同様に統合
-- `reporter_agent.py` のインデント不備を修正し、テストとして `uv run python scripts/run_analysis.py -e 3 --max-instances 1` を実行
+- 外部仕様参照: `

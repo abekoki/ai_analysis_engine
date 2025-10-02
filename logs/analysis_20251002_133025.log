@@ -1,0 +1,19 @@
+2025-10-02 13:30:25,872 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 13:30:25,873 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 3
+2025-10-02 13:30:25,909 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 13:30:25,912 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 13:30:25,913 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 13:30:25,914 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 13:30:25,915 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 13:30:26,354 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 13:30:26,354 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-10-02 13:30:26,716 - ai_analysis_engine.orchestrator.orchestrator - ERROR - Instance analysis failed: 'InstanceAnalyzer' object has no attribute '_resolve_algorithm_output_csv'
+Traceback (most recent call last):
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\orchestrator\orchestrator.py", line 193, in run_analysis_by_evaluation_result
+    instance_results = self.instance_analyzer.analyze_instances(
+  File "C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\src\ai_analysis_engine\instance_analyzer\instance_analyzer.py", line 61, in analyze_instances
+    csv_path = self._resolve_algorithm_output_csv(algo_data)
+AttributeError: 'InstanceAnalyzer' object has no attribute '_resolve_algorithm_output_csv'
+2025-10-02 13:30:26,725 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_133025\summary\summary.md
+2025-10-02 13:30:26,737 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=66
+2025-10-02 13:30:26,738 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

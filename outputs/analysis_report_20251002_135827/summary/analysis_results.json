@@ -1,0 +1,2052 @@
+{
+  "datasets": [
+    {
+      "id": "1_4",
+      "algorithm_output_csv": "C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\03_algorithm_output\\v0.1.1+fa5172ba\\20250922-133705\\51\\1.csv",
+      "core_output_csv": "C:\\workspace\\ImproveAlgorithmDevelopment\\development_datas\\02_core_lib_output\\v1.0.0\\1\\WIN_20250819_10_10_42_Pro_analysis.csv",
+      "algorithm_spec_md": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\01_algorithm_specification\\AS_drowsy_detection.md",
+      "algorithm_code_files": [
+        "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+        "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py"
+      ],
+      "evaluation_spec_md": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md",
+      "evaluation_code_files": [
+        "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py"
+      ],
+      "expected_result": "1",
+      "evaluation_interval": {
+        "start": 421,
+        "end": 519,
+        "task_id": "1_4",
+        "video_ID": 1,
+        "tag_ID": 4
+      },
+      "data_summary": {
+        "analysis": {
+          "1": {
+            "shape": [
+              99,
+              6
+            ],
+            "columns": [
+              "frame_num",
+              "is_drowsy",
+              "left_eye_closed",
+              "right_eye_closed",
+              "continuous_time",
+              "error_code"
+            ],
+            "dtypes": {
+              "frame_num": "int64",
+              "is_drowsy": "int64",
+              "left_eye_closed": "bool",
+              "right_eye_closed": "bool",
+              "continuous_time": "float64",
+              "error_code": "float64"
+            },
+            "missing_values": {
+              "frame_num": 0,
+              "is_drowsy": 0,
+              "left_eye_closed": 0,
+              "right_eye_closed": 0,
+              "continuous_time": 0,
+              "error_code": 99
+            },
+            "basic_stats": {
+              "frame_num": {
+                "count": 99.0,
+                "mean": 470.0,
+                "std": 28.722813232690143,
+                "min": 421.0,
+                "25%": 445.5,
+                "50%": 470.0,
+                "75%": 494.5,
+                "max": 519.0
+              },
+              "is_drowsy": {
+                "count": 99.0,
+                "mean": 0.0,
+                "std": 0.0,
+                "min": 0.0,
+                "25%": 0.0,
+                "50%": 0.0,
+                "75%": 0.0,
+                "max": 0.0
+              },
+              "continuous_time": {
+                "count": 99.0,
+                "mean": 0.0,
+                "std": 0.0,
+                "min": 0.0,
+                "25%": 0.0,
+                "50%": 0.0,
+                "75%": 0.0,
+                "max": 0.0
+              },
+              "error_code": {
+                "count": 0.0,
+                "mean": NaN,
+                "std": NaN,
+                "min": NaN,
+                "25%": NaN,
+                "50%": NaN,
+                "75%": NaN,
+                "max": NaN
+              }
+            },
+            "sample": [
+              {
+                "frame_num": 421,
+                "is_drowsy": 0,
+                "left_eye_closed": false,
+                "right_eye_closed": false,
+                "continuous_time": 0.0,
+                "error_code": NaN
+              },
+              {
+                "frame_num": 422,
+                "is_drowsy": 0,
+                "left_eye_closed": false,
+                "right_eye_closed": true,
+                "continuous_time": 0.0,
+                "error_code": NaN
+              },
+              {
+                "frame_num": 423,
+                "is_drowsy": 0,
+                "left_eye_closed": false,
+                "right_eye_closed": true,
+                "continuous_time": 0.0,
+                "error_code": NaN
+              },
+              {
+                "frame_num": 424,
+                "is_drowsy": 0,
+                "left_eye_closed": false,
+                "right_eye_closed": true,
+                "continuous_time": 0.0,
+                "error_code": NaN
+              },
+              {
+                "frame_num": 425,
+                "is_drowsy": 0,
+                "left_eye_closed": false,
+                "right_eye_closed": true,
+                "continuous_time": 0.0,
+                "error_code": NaN
+              }
+            ]
+          },
+          "WIN_20250819_10_10_42_Pro_analysis": {
+            "shape": [
+              99,
+              29
+            ],
+            "columns": [
+              "frame",
+              "leye_openness",
+              "reye_openness",
+              "confidence",
+              "face_yaw",
+              "face_pitch",
+              "nose_length",
+              "normal_vector",
+              "distance_x",
+              "distance_y",
+              "triangle_area",
+              "eye_distance",
+              "sunglasses_detected",
+              "eye_roi_width",
+              "eye_roi_height",
+              "left_eye_x",
+              "left_eye_y",
+              "left_eye_z",
+              "right_eye_x",
+              "right_eye_y",
+              "right_eye_z",
+              "nose_tip_x",
+              "nose_tip_y",
+              "nose_tip_z",
+              "nose_bridge_x",
+              "nose_bridge_y",
+              "nose_bridge_z",
+              "triangle_center_x",
+              "triangle_center_y"
+            ],
+            "dtypes": {
+              "frame": "int64",
+              "leye_openness": "float64",
+              "reye_openness": "float64",
+              "confidence": "float64",
+              "face_yaw": "float64",
+              "face_pitch": "float64",
+              "nose_length": "float64",
+              "normal_vector": "float64",
+              "distance_x": "int64",
+              "distance_y": "int64",
+              "triangle_area": "float64",
+              "eye_distance": "float64",
+              "sunglasses_detected": "bool",
+              "eye_roi_width": "int64",
+              "eye_roi_height": "int64",
+              "left_eye_x": "float64",
+              "left_eye_y": "float64",
+              "left_eye_z": "float64",
+              "right_eye_x": "float64",
+              "right_eye_y": "float64",
+              "right_eye_z": "float64",
+              "nose_tip_x": "float64",
+              "nose_tip_y": "float64",
+              "nose_tip_z": "float64",
+              "nose_bridge_x": "float64",
+              "nose_bridge_y": "float64",
+              "nose_bridge_z": "float64",
+              "triangle_center_x": "int64",
+              "triangle_center_y": "int64"
+            },
+            "missing_values": {
+              "frame": 0,
+              "leye_openness": 0,
+              "reye_openness": 0,
+              "confidence": 0,
+              "face_yaw": 0,
+              "face_pitch": 0,
+              "nose_length": 0,
+              "normal_vector": 0,
+              "distance_x": 0,
+              "distance_y": 0,
+              "triangle_area": 0,
+              "eye_distance": 0,
+              "sunglasses_detected": 0,
+              "eye_roi_width": 0,
+              "eye_roi_height": 0,
+              "left_eye_x": 0,
+              "left_eye_y": 0,
+              "left_eye_z": 0,
+              "right_eye_x": 0,
+              "right_eye_y": 0,
+              "right_eye_z": 0,
+              "nose_tip_x": 0,
+              "nose_tip_y": 0,
+              "nose_tip_z": 0,
+              "nose_bridge_x": 0,
+              "nose_bridge_y": 0,
+              "nose_bridge_z": 0,
+              "triangle_center_x": 0,
+              "triangle_center_y": 0
+            },
+            "basic_stats": {
+              "frame": {
+                "count": 99.0,
+                "mean": 470.0,
+                "std": 28.722813232690143,
+                "min": 421.0,
+                "25%": 445.5,
+                "50%": 470.0,
+                "75%": 494.5,
+                "max": 519.0
+              },
+              "leye_openness": {
+                "count": 99.0,
+                "mean": 0.14677365200906,
+                "std": 0.01538432511459133,
+                "min": 0.1096638608655679,
+                "25%": 0.1348052224603101,
+                "50%": 0.1517532195131778,
+                "75%": 0.15820223843433945,
+                "max": 0.1689409734746203
+              },
+              "reye_openness": {
+                "count": 99.0,
+                "mean": 0.056409074971862774,
+                "std": 0.01987734452754443,
+                "min": 0.027227223636758,
+                "25%": 0.045122989736963,
+                "50%": 0.0523731245778195,
+                "75%": 0.06441301995711365,
+                "max": 0.1487750872448842
+              },
+              "confidence": {
+                "count": 99.0,
+                "mean": 1.0,
+                "std": 0.0,
+                "min": 1.0,
+                "25%": 1.0,
+                "50%": 1.0,
+                "75%": 1.0,
+                "max": 1.0
+              },
+              "face_yaw": {
+                "count": 99.0,
+                "mean": 7.893939393939394,
+                "std": 0.20544535090332952,
+                "min": 7.5,
+                "25%": 8.0,
+                "50%": 8.0,
+                "75%": 8.0,
+                "max": 8.0
+              },
+              "face_pitch": {
+                "count": 99.0,
+                "mean": -14.909090909090908,
+                "std": 0.2185718529832056,
+                "min": -15.5,
+                "25%": -15.0,
+                "50%": -15.0,
+                "75%": -15.0,
+                "max": -14.5
+              },
+              "nose_length": {
+                "count": 99.0,
+                "mean": 53.31691483876054,
+                "std": 0.4122731995935024,
+                "min": 52.50887633314384,
+                "25%": 52.9818701855837,
+                "50%": 53.346650190964496,
+                "75%": 53.63161658814862,
+                "max": 54.16511646955849
+              },
+              "normal_vector": {
+                "count": 99.0,
+                "mean": 0.49512235308557023,
+                "std": 0.007143860952286569,
+                "min": 0.4760448253560882,
+                "25%": 0.49126685179418994,
+                "50%": 0.4977515804779832,
+                "75%": 0.4980318367299499,
+                "max": 0.519648330302206
+              },
+              "distance_x": {
+                "count": 99.0,
+                "mean": 15.787878787878787,
+                "std": 0.41089070180665904,
+                "min": 15.0,
+                "25%": 16.0,
+                "50%": 16.0,
+                "75%": 16.0,
+                "max": 16.0
+              },
+              "distance_y": {
+                "count": 99.0,
+                "mean": -29.818181818181817,
+                "std": 0.4371437059664112,
+                "min": -31.0,
+                "25%": -30.0,
+                "50%": -30.0,
+                "75%": -30.0,
+                "max": -29.0
+              },
+              "triangle_area": {
+                "count": 99.0,
+                "mean": 2270.90404040404,
+                "std": 44.717918426582806,
+                "min": 2169.5,
+                "25%": 2243.25,
+                "50%": 2265.0,
+                "75%": 2301.0,
+                "max": 2362.0
+              },
+              "eye_distance": {
+                "count": 99.0,
+                "mean": 104.32910045895876,
+                "std": 0.772228058099624,
+                "min": 103.0194156457898,
+                "25%": 104.01922899156676,
+                "50%": 104.04326023342406,
+                "75%": 105.03094714587766,
+                "max": 106.04244433244644
+              },
+              "eye_roi_width": {
+                "count": 99.0,
+                "mean": 77.29292929292929,
+                "std": 0.9609999602085962,
+                "min": 76.0,
+                "25%": 76.0,
+                "50%": 78.0,
+                "75%": 78.0,
+                "max": 78.0
+              },
+              "eye_roi_height": {
+                "count": 99.0,
+                "mean": 46.0,
+                "std": 0.0,
+                "min": 46.0,
+                "25%": 46.0,
+                "50%": 46.0,
+                "75%": 46.0,
+                "max": 46.0
+              },
+              "left_eye_x": {
+                "count": 99.0,
+                "mean": 0.471816270038335,
+                "std": 0.0012663511313453753,
+                "min": 0.4694239497184753,
+                "25%": 0.470867782831192,
+                "50%": 0.4716717302799225,
+                "75%": 0.4726407080888748,
+                "max": 0.4757062494754791
+              },
+              "left_eye_y": {
+                "count": 99.0,
+                "mean": 0.49949938570610203,
+                "std": 0.0023712192422712048,
+                "min": 0.4946314692497253,
+                "25%": 0.4979264587163925,
+                "50%": 0.4984723329544067,
+                "75%": 0.5008436739444733,
+                "max": 0.5061100721359253
+              },
+              "left_eye_z": {
+                "count": 99.0,
+                "mean": -0.00928812807971475,
+                "std": 0.0007680600012615437,
+                "min": -0.0110125616192817,
+                "25%": -0.00987289892509575,
+                "50%": -0.0092209866270422,
+                "75%": -0.00873280828818675,
+                "max": -0.0078526362776756
+              },
+              "right_eye_x": {
+                "count": 99.0,
+                "mean": 0.6347258385985789,
+                "std": 0.0013511833777550587,
+                "min": 0.6326637268066406,
+                "25%": 0.633656769990921,
+                "50%": 0.6345040798187256,
+                "75%": 0.6357298493385315,
+                "max": 0.6382139921188354
+              },
+              "right_eye_y": {
+                "count": 99.0,
+                "mean": 0.5051573150687747,
+                "std": 0.002499585412326514,
+                "min": 0.499146044254303,
+                "25%": 0.5033530592918396,
+                "50%": 0.504249632358551,
+                "75%": 0.5071262419223785,
+                "max": 0.5101801753044128
+              },
+              "right_eye_z": {
+                "count": 99.0,
+                "mean": 0.04567984009932985,
+                "std": 0.0005770131047441952,
+                "min": 0.0439108535647392,
+                "25%": 0.0453202296048402,
+                "50%": 0.0456530563533306,
+                "75%": 0.046053940430283505,
+                "max": 0.0470584630966186
+              },
+              "nose_tip_x": {
+                "count": 99.0,
+                "mean": 0.5894246119441409,
+                "std": 0.001195070915934277,
+                "min": 0.5870431661605835,
+                "25%": 0.5886629819869995,
+                "50%": 0.589280903339386,
+                "75%": 0.5904112160205841,
+                "max": 0.5917890667915344
+              },
+              "nose_tip_y": {
+                "count": 99.0,
+                "mean": 0.5942358344492286,
+                "std": 0.0031174325229153315,
+                "min": 0.5902769565582275,
+                "25%": 0.5918091237545013,
+                "50%": 0.5927426218986511,
+                "75%": 0.5964398682117462,
+                "max": 0.6013720035552979
+              },
+              "nose_tip_z": {
+                "count": 99.0,
+                "mean": -0.05532164352409764,
+                "std": 0.0002552099967230695,
+                "min": -0.055946908891201,
+                "25%": -0.0555145181715488,
+                "50%": -0.0553066246211528,
+                "75%": -0.055155288428068105,
+                "max": -0.0546424351632595
+              },
+              "nose_bridge_x": {
+                "count": 99.0,
+                "mean": 0.5727685593595409,
+                "std": 0.0012493942188132646,
+                "min": 0.5706846117973328,
+                "25%": 0.5716710686683655,
+                "50%": 0.5726050734519958,
+                "75%": 0.5738113820552826,
+                "max": 0.575452983379364
+              },
+              "nose_bridge_y": {
+                "count": 99.0,
+                "mean": 0.4854029209324808,
+                "std": 0.002512039219213482,
+                "min": 0.4827145338058471,
+                "25%": 0.48360078036785126,
+                "50%": 0.4841505885124206,
+                "75%": 0.48679502308368683,
+                "max": 0.4921501874923706
+              },
+              "nose_bridge_z": {
+                "count": 99.0,
+                "mean": -0.018999606427369652,
+                "std": 0.0006596237474719562,
+                "min": -0.020503282546997,
+                "25%": -0.01942275464534755,
+                "50%": -0.0189985651522874,
+                "75%": -0.01856277417391535,
+                "max": -0.0176051668822765
+              },
+              "triangle_center_x": {
+                "count": 99.0,
+                "mean": 360.93939393939394,
+                "std": 0.8183879352825013,
+                "min": 360.0,
+                "25%": 360.0,
+                "50%": 361.0,
+                "75%": 362.0,
+                "max": 363.0
+              },
+              "triangle_center_y": {
+                "count": 99.0,
+                "mean": 254.94949494949495,
+                "std": 1.32767817416643,
+                "min": 253.0,
+                "25%": 254.0,
+                "50%": 254.0,
+                "75%": 256.0,
+                "max": 258.0
+              }
+            },
+            "sample": [
+              {
+                "frame": 421,
+                "leye_openness": 0.1219402569469007,
+                "reye_openness": 0.0635079375409826,
+                "confidence": 1.0,
+                "face_yaw": 8.0,
+                "face_pitch": -15.0,
+                "nose_length": 53.30262984664413,
+                "normal_vector": 0.501571896984779,
+                "distance_x": 16,
+                "distance_y": -30,
+                "triangle_area": 2362.0,
+                "eye_distance": 106.01886624558855,
+                "sunglasses_detected": false,
+                "eye_roi_width": 78,
+                "eye_roi_height": 46,
+                "left_eye_x": 0.4727240800857544,
+                "left_eye_y": 0.5061100721359253,
+                "left_eye_z": -0.0100769931450486,
+                "right_eye_x": 0.637573778629303,
+                "right_eye_y": 0.5100253224372864,
+                "right_eye_z": 0.045352891087532,
+                "nose_tip_x": 0.5911133885383606,
+                "nose_tip_y": 0.6010187268257141,
+                "nose_tip_z": -0.0555156208574771,
+                "nose_bridge_x": 0.574696958065033,
+                "nose_bridge_y": 0.4921501874923706,
+                "nose_bridge_z": -0.0199298355728387,
+                "triangle_center_x": 362,
+                "triangle_center_y": 258
+              },
+              {
+                "frame": 422,
+                "leye_openness": 0.1142260593410437,
+                "reye_openness": 0.065352325894392,
+                "confidence": 1.0,
+                "face_yaw": 7.5,
+                "face_pitch": -15.0,
+                "nose_length": 53.4229185741697,
+                "normal_vector": 0.5064997682508064,
+                "distance_x": 15,
+                "distance_y": -30,
+                "triangle_area": 2340.0,
+                "eye_distance": 105.01904589168576,
+                "sunglasses_detected": false,
+                "eye_roi_width": 78,
+                "eye_roi_height": 46,
+                "left_eye_x": 0.474064826965332,
+                "left_eye_y": 0.5053611993789673,
+                "left_eye_z": -0.0106848254799842,
+                "right_eye_x": 0.6382139921188354,
+                "right_eye_y": 0.5101801753044128,
+                "right_eye_z": 0.045120645314455,
+                "nose_tip_x": 0.5915806889533997,
+                "nose_tip_y": 0.6002128720283508,
+                "nose_tip_z": -0.0555144697427749,
+                "nose_bridge_x": 0.575452983379364,
+                "nose_bridge_y": 0.4910122156143188,
+                "nose_bridge_z": -0.020503282546997,
+                "triangle_center_x": 363,
+                "triangle_center_y": 258
+              },
+              {
+                "frame": 423,
+                "leye_openness": 0.121132750102033,
+                "reye_openness": 0.0530014291745768,
+                "confidence": 1.0,
+                "face_yaw": 8.0,
+                "face_pitch": -15.0,
+                "nose_length": 53.860771955047845,
+                "normal_vector": 0.501571896984779,
+                "distance_x": 16,
+                "distance_y": -30,
+                "triangle_area": 2362.0,
+                "eye_distance": 106.01886624558855,
+                "sunglasses_detected": false,
+                "eye_roi_width": 78,
+                "eye_roi_height": 46,
+                "left_eye_x": 0.4731276035308838,
+                "left_eye_y": 0.5050232410430908,
+                "left_eye_z": -0.0106366164982318,
+                "right_eye_x": 0.6378088593482971,
+                "right_eye_y": 0.5100474953651428,
+                "right_eye_z": 0.0445516929030418,
+                "nose_tip_x": 0.5908428430557251,
+                "nose_tip_y": 0.6013720035552979,
+                "nose_tip_z": -0.0555463284254074,
+                "nose_bridge_x": 0.5746937394142151,
+                "nose_bridge_y": 0.4912473559379577,
+                "nose_bridge_z": -0.0205019768327474,
+                "triangle_center_x": 362,
+                "triangle_center_y": 258
+              },
+              {
+                "frame": 424,
+                "leye_openness": 0.1226827771274791,
+                "reye_openness": 0.0587429530590805,
+                "confidence": 1.0,
+                "face_yaw": 8.0,
+                "face_pitch": -15.0,
+                "nose_length": 53.407098426258834,
+                "normal_vector": 0.501571896984779,
+                "distance_x": 16,
+                "distance_y": -30,
+                "triangle_area": 2362.0,
+                "eye_distance": 106.01886624558855,
+                "sunglasses_detected": false,
+                "eye_roi_width": 78,
+                "eye_roi_height": 46,
+                "left_eye_x": 0.4723474383354187,
+                "left_eye_y": 0.5045567154884338,
+                "left_eye_z": -0.010218683630228,
+                "right_eye_x": 0.6381005048751831,
+                "right_eye_y": 0.5097149014472961,
+                "right_eye_z": 0.0450033098459243,
+                "nose_tip_x": 0.5908761620521545,
+                "nose_tip_y": 0.6000276207923889,
+                "nose_tip_z": -0.0554568283259868,
+                "nose_bridge_x": 0.5744764804840088,
+                "nose_bridge_y": 0.4909326136112213,
+                "nose_bridge_z": -0.0199954565614461,
+                "triangle_center_x": 362,
+                "triangle_center_y": 258
+              },
+              {
+                "frame": 425,
+                "leye_openness": 0.1280305880390369,
+                "reye_openness": 0.0643336659548646,
+                "confidence": 1.0,
+                "face_yaw": 8.0,
+                "face_pitch": -15.0,
+                "nose_length": 53.30814472668583,
+                "normal_vector": 0.501571896984779,
+                "distance_x": 16,
+                "distance_y": -30,
+                "triangle_area": 2362.0,
+                "eye_distance": 106.01886624558855,
+                "sunglasses_detected": false,
+                "eye_roi_width": 78,
+                "eye_roi_height": 46,
+                "left_eye_x": 0.4719894230365753,
+                "left_eye_y": 0.5043251514434814,
+                "left_eye_z": -0.0106337005272507,
+                "right_eye_x": 0.637606680393219,
+                "right_eye_y": 0.5100131630897522,
+                "right_eye_z": 0.0449202060699462,
+                "nose_tip_x": 0.5911291837692261,
+                "nose_tip_y": 0.6000531315803528,
+                "nose_tip_z": -0.0550935715436935,
+                "nose_bridge_x": 0.5751237869262695,
+                "nose_bridge_y": 0.4910641312599182,
+                "nose_bridge_z": -0.0203126855194568,
+                "triangle_center_x": 362,
+                "triangle_center_y": 258
+              }
+            ]
+          }
+        },
+        "plots": {
+          "1": "1_timeseries.png",
+          "WIN_20250819_10_10_42_Pro_analysis": "WIN_20250819_10_10_42_Pro_analysis_timeseries.png"
+        },
+        "column_info": {
+          "spec_results": [
+            {
+              "content": "# Evaluation Engine\n\nThis module evaluates the drowsy_detection algorithm using core library outputs stored in ../DataWareHouse.\n\n- Input scope: ../DataWareHouse/02_core_lib_output\n- Per-video algorithm outputs: ../DataWareHouse/03_algorithm_output/{algorithm_version}/{video_name}_result.csv\n- Per-run evaluation results: results/{run_id}/summary.csv and results/{run_id}/{data_name}.csv\n\nRun:\n```powershell\nuv run python evaluation_engine/run_evaluation.py\n```",
+              "metadata": {
+                "source": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md",
+                "segment": "evaluation_specs",
+                "chunk_id": 0,
+                "file_hash": "1ce379a642b57d63a6ecea7a62792b89"
+              },
+              "score": 1.687123417854309,
+              "segment": "evaluation_specs",
+              "source": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md"
+            }
+          ],
+          "inferred_columns": {}
+        },
+        "column_mapping": {
+          "column_mapping": {
+            "input": {},
+            "output": {},
+            "thresholds": {
+              "leye_openness_threshold": 0.0,
+              "reye_openness_threshold": 0.0,
+              "confidence_threshold": 0.0,
+              "close_threshold": 0.5
+            }
+          }
+        },
+        "representative_stats": {
+          "1": {
+            "frame_num": {
+              "mean": 470.0,
+              "median": 470.0,
+              "min": 421.0,
+              "max": 519.0
+            },
+            "is_drowsy": {
+              "mean": 0.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 0.0
+            },
+            "continuous_time": {
+              "mean": 0.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 0.0
+            }
+          },
+          "WIN_20250819_10_10_42_Pro_analysis": {
+            "frame": {
+              "mean": 470.0,
+              "median": 470.0,
+              "min": 421.0,
+              "max": 519.0
+            },
+            "leye_openness": {
+              "mean": 0.147,
+              "median": 0.152,
+              "min": 0.11,
+              "max": 0.169
+            },
+            "reye_openness": {
+              "mean": 0.056,
+              "median": 0.052,
+              "min": 0.027,
+              "max": 0.149
+            },
+            "confidence": {
+              "mean": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "max": 1.0
+            },
+            "face_yaw": {
+              "mean": 7.894,
+              "median": 8.0,
+              "min": 7.5,
+              "max": 8.0
+            },
+            "face_pitch": {
+              "mean": -14.909,
+              "median": -15.0,
+              "min": -15.5,
+              "max": -14.5
+            },
+            "nose_length": {
+              "mean": 53.317,
+              "median": 53.347,
+              "min": 52.509,
+              "max": 54.165
+            },
+            "normal_vector": {
+              "mean": 0.495,
+              "median": 0.498,
+              "min": 0.476,
+              "max": 0.52
+            },
+            "distance_x": {
+              "mean": 15.788,
+              "median": 16.0,
+              "min": 15.0,
+              "max": 16.0
+            },
+            "distance_y": {
+              "mean": -29.818,
+              "median": -30.0,
+              "min": -31.0,
+              "max": -29.0
+            },
+            "triangle_area": {
+              "mean": 2270.904,
+              "median": 2265.0,
+              "min": 2169.5,
+              "max": 2362.0
+            },
+            "eye_distance": {
+              "mean": 104.329,
+              "median": 104.043,
+              "min": 103.019,
+              "max": 106.042
+            },
+            "eye_roi_width": {
+              "mean": 77.293,
+              "median": 78.0,
+              "min": 76.0,
+              "max": 78.0
+            },
+            "eye_roi_height": {
+              "mean": 46.0,
+              "median": 46.0,
+              "min": 46.0,
+              "max": 46.0
+            },
+            "left_eye_x": {
+              "mean": 0.472,
+              "median": 0.472,
+              "min": 0.469,
+              "max": 0.476
+            },
+            "left_eye_y": {
+              "mean": 0.499,
+              "median": 0.498,
+              "min": 0.495,
+              "max": 0.506
+            },
+            "left_eye_z": {
+              "mean": -0.009,
+              "median": -0.009,
+              "min": -0.011,
+              "max": -0.008
+            },
+            "right_eye_x": {
+              "mean": 0.635,
+              "median": 0.635,
+              "min": 0.633,
+              "max": 0.638
+            },
+            "right_eye_y": {
+              "mean": 0.505,
+              "median": 0.504,
+              "min": 0.499,
+              "max": 0.51
+            },
+            "right_eye_z": {
+              "mean": 0.046,
+              "median": 0.046,
+              "min": 0.044,
+              "max": 0.047
+            },
+            "nose_tip_x": {
+              "mean": 0.589,
+              "median": 0.589,
+              "min": 0.587,
+              "max": 0.592
+            },
+            "nose_tip_y": {
+              "mean": 0.594,
+              "median": 0.593,
+              "min": 0.59,
+              "max": 0.601
+            },
+            "nose_tip_z": {
+              "mean": -0.055,
+              "median": -0.055,
+              "min": -0.056,
+              "max": -0.055
+            },
+            "nose_bridge_x": {
+              "mean": 0.573,
+              "median": 0.573,
+              "min": 0.571,
+              "max": 0.575
+            },
+            "nose_bridge_y": {
+              "mean": 0.485,
+              "median": 0.484,
+              "min": 0.483,
+              "max": 0.492
+            },
+            "nose_bridge_z": {
+              "mean": -0.019,
+              "median": -0.019,
+              "min": -0.021,
+              "max": -0.018
+            },
+            "triangle_center_x": {
+              "mean": 360.939,
+              "median": 361.0,
+              "min": 360.0,
+              "max": 363.0
+            },
+            "triangle_center_y": {
+              "mean": 254.949,
+              "median": 254.0,
+              "min": 253.0,
+              "max": 258.0
+            }
+          }
+        },
+        "evaluation_interval": {
+          "start": 421,
+          "end": 519,
+          "task_id": "1_4",
+          "video_ID": 1,
+          "tag_ID": 4
+        }
+      },
+      "consistency_check": {
+        "expected_interpretation": "1",
+        "checks_performed": [
+          "Dataframe 1: 1041 rows",
+          "Dataframe WIN_20250819_10_10_42_Pro_analysis: 1041 rows"
+        ],
+        "overall_consistent": true,
+        "issues": [],
+        "target_interval": null,
+        "require_exists": false,
+        "detection": {
+          "exists": true,
+          "longest_run": 127,
+          "runs": [
+            {
+              "start_frame": 65,
+              "end_frame": 153,
+              "length": 89
+            },
+            {
+              "start_frame": 209,
+              "end_frame": 309,
+              "length": 101
+            },
+            {
+              "start_frame": 422,
+              "end_frame": 517,
+              "length": 96
+            },
+            {
+              "start_frame": 621,
+              "end_frame": 706,
+              "length": 86
+            },
+            {
+              "start_frame": 812,
+              "end_frame": 938,
+              "length": 127
+            },
+            {
+              "start_frame": 987,
+              "end_frame": 989,
+              "length": 3
+            }
+          ]
+        },
+        "input_column_stats": {},
+        "rag_column_validation": {}
+      },
+      "hypotheses": [],
+      "verification_results": [],
+      "report_content": "# 個別データ分析レポート - 1_4\n\n## 概要\n\n- 結論: 連続した閉眼状態が検知されず、アルゴリズムの閾値設定や入力データの特性が影響している可能性があります。\n- 解析対象動画: 1_4\n- フレーム区間: 421 - 519\n- 期待値: 1\n- 検知結果: すべてのフレームで「非連続閉眼状態」と判定されました（is_drowsy = 0）。\n\n## 確認結果\n\n![アルゴリズム出力結果のグラフ](images/1_timeseries.png)\nアルゴリズム出力結果\n\n![コア出力結果のグラフ](images/WIN_20250819_10_10_42_Pro_analysis_timeseries.png)\nコア出力結果\n\n- 入出力の確認結果: \n  - 左目の開眼度 (mean=0.147, median=0.152) と右目の開眼度 (mean=0.056, median=0.052) の値から、右目の開眼度が非常に低く、左目も閾値に近い値であることが確認されました。\n  - 顔検出信頼度は常に1.0であり、信頼性は高いと評価されますが、連続閉眼状態の判定には至りませんでした。\n\n- 考えられる原因:\n  - 右目の開眼度が非常に低いため、閾値を下回ることができず、連続閉眼状態と判定されなかった。\n  - 左目の開眼度も閾値に近いため、両目が閉眼状態と見なされる時間が不足している可能性がある。\n  - 入力データの特性により、連続した閉眼状態が発生していない可能性も考えられる。\n\n## 推奨事項\n\n- 閾値設定の見直し: 左右の目の開眼度の閾値を再評価し、特に右目の閾値を下げることを検討してください。\n- データ収集の改善: より多様なシナリオでのデータ収集を行い、アルゴリズムの適用範囲を広げることを推奨します。\n- アルゴリズムの調整: 連続閉眼状態の判定に必要な時間閾値を短縮することを検討し、より敏感な検知を目指してください。\n\n## 参照した仕様/コード（抜粋）\n- 連続閉眼検知アルゴリズム仕様書 (AS_drowsy_detection)\n- 評価環境仕様: Evaluation Engine README.md\n- アルゴリズムの処理フローと擬似コード\n\n---\n\n## アルゴリズム設定情報\n- アルゴリズム名: Unknown Algorithm\n- 閾値設定: {}\n- 必須列: []\n",
+      "status": "completed",
+      "error_message": null
+    }
+  ],
+  "spec_documents": [
+    "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\01_algorithm_specification\\AS_drowsy_detection.md",
+    "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\02_specific_design\\SD_drowsy_detection_python.md",
+    "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\02_specific_design\\implementation_summary.md",
+    "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md"
+  ],
+  "code_documents": [
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\main.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\cli\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\config.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\validators.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\config\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\drowsy_detector.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\eye_state.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\timer.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\core\\__init__.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\data_processor.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\logger.py",
+    "./external\\drowsy_detection/src/drowsy_detection\\utils\\__init__.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py",
+    "./external\\drowsy_detection/evaluation_engine\\run_evaluation.py"
+  ],
+  "current_dataset_index": 1,
+  "vector_stores": {
+    "segments": {
+      "algorithm_specs": "vectorstore_algorithm_specs",
+      "evaluation_specs": "vectorstore_evaluation_specs",
+      "algorithm_code": "vectorstore_algorithm_code",
+      "evaluation_code": "vectorstore_evaluation_code"
+    },
+    "last_updated": "2025-10-02T13:58:28.349221",
+    "is_initialized": true
+  },
+  "workflow_step": "verifier",
+  "next_action": null,
+  "analysis_results": {
+    "1_4": {
+      "analysis": {
+        "1": {
+          "shape": [
+            99,
+            6
+          ],
+          "columns": [
+            "frame_num",
+            "is_drowsy",
+            "left_eye_closed",
+            "right_eye_closed",
+            "continuous_time",
+            "error_code"
+          ],
+          "dtypes": {
+            "frame_num": "int64",
+            "is_drowsy": "int64",
+            "left_eye_closed": "bool",
+            "right_eye_closed": "bool",
+            "continuous_time": "float64",
+            "error_code": "float64"
+          },
+          "missing_values": {
+            "frame_num": 0,
+            "is_drowsy": 0,
+            "left_eye_closed": 0,
+            "right_eye_closed": 0,
+            "continuous_time": 0,
+            "error_code": 99
+          },
+          "basic_stats": {
+            "frame_num": {
+              "count": 99.0,
+              "mean": 470.0,
+              "std": 28.722813232690143,
+              "min": 421.0,
+              "25%": 445.5,
+              "50%": 470.0,
+              "75%": 494.5,
+              "max": 519.0
+            },
+            "is_drowsy": {
+              "count": 99.0,
+              "mean": 0.0,
+              "std": 0.0,
+              "min": 0.0,
+              "25%": 0.0,
+              "50%": 0.0,
+              "75%": 0.0,
+              "max": 0.0
+            },
+            "continuous_time": {
+              "count": 99.0,
+              "mean": 0.0,
+              "std": 0.0,
+              "min": 0.0,
+              "25%": 0.0,
+              "50%": 0.0,
+              "75%": 0.0,
+              "max": 0.0
+            },
+            "error_code": {
+              "count": 0.0,
+              "mean": NaN,
+              "std": NaN,
+              "min": NaN,
+              "25%": NaN,
+              "50%": NaN,
+              "75%": NaN,
+              "max": NaN
+            }
+          },
+          "sample": [
+            {
+              "frame_num": 421,
+              "is_drowsy": 0,
+              "left_eye_closed": false,
+              "right_eye_closed": false,
+              "continuous_time": 0.0,
+              "error_code": NaN
+            },
+            {
+              "frame_num": 422,
+              "is_drowsy": 0,
+              "left_eye_closed": false,
+              "right_eye_closed": true,
+              "continuous_time": 0.0,
+              "error_code": NaN
+            },
+            {
+              "frame_num": 423,
+              "is_drowsy": 0,
+              "left_eye_closed": false,
+              "right_eye_closed": true,
+              "continuous_time": 0.0,
+              "error_code": NaN
+            },
+            {
+              "frame_num": 424,
+              "is_drowsy": 0,
+              "left_eye_closed": false,
+              "right_eye_closed": true,
+              "continuous_time": 0.0,
+              "error_code": NaN
+            },
+            {
+              "frame_num": 425,
+              "is_drowsy": 0,
+              "left_eye_closed": false,
+              "right_eye_closed": true,
+              "continuous_time": 0.0,
+              "error_code": NaN
+            }
+          ]
+        },
+        "WIN_20250819_10_10_42_Pro_analysis": {
+          "shape": [
+            99,
+            29
+          ],
+          "columns": [
+            "frame",
+            "leye_openness",
+            "reye_openness",
+            "confidence",
+            "face_yaw",
+            "face_pitch",
+            "nose_length",
+            "normal_vector",
+            "distance_x",
+            "distance_y",
+            "triangle_area",
+            "eye_distance",
+            "sunglasses_detected",
+            "eye_roi_width",
+            "eye_roi_height",
+            "left_eye_x",
+            "left_eye_y",
+            "left_eye_z",
+            "right_eye_x",
+            "right_eye_y",
+            "right_eye_z",
+            "nose_tip_x",
+            "nose_tip_y",
+            "nose_tip_z",
+            "nose_bridge_x",
+            "nose_bridge_y",
+            "nose_bridge_z",
+            "triangle_center_x",
+            "triangle_center_y"
+          ],
+          "dtypes": {
+            "frame": "int64",
+            "leye_openness": "float64",
+            "reye_openness": "float64",
+            "confidence": "float64",
+            "face_yaw": "float64",
+            "face_pitch": "float64",
+            "nose_length": "float64",
+            "normal_vector": "float64",
+            "distance_x": "int64",
+            "distance_y": "int64",
+            "triangle_area": "float64",
+            "eye_distance": "float64",
+            "sunglasses_detected": "bool",
+            "eye_roi_width": "int64",
+            "eye_roi_height": "int64",
+            "left_eye_x": "float64",
+            "left_eye_y": "float64",
+            "left_eye_z": "float64",
+            "right_eye_x": "float64",
+            "right_eye_y": "float64",
+            "right_eye_z": "float64",
+            "nose_tip_x": "float64",
+            "nose_tip_y": "float64",
+            "nose_tip_z": "float64",
+            "nose_bridge_x": "float64",
+            "nose_bridge_y": "float64",
+            "nose_bridge_z": "float64",
+            "triangle_center_x": "int64",
+            "triangle_center_y": "int64"
+          },
+          "missing_values": {
+            "frame": 0,
+            "leye_openness": 0,
+            "reye_openness": 0,
+            "confidence": 0,
+            "face_yaw": 0,
+            "face_pitch": 0,
+            "nose_length": 0,
+            "normal_vector": 0,
+            "distance_x": 0,
+            "distance_y": 0,
+            "triangle_area": 0,
+            "eye_distance": 0,
+            "sunglasses_detected": 0,
+            "eye_roi_width": 0,
+            "eye_roi_height": 0,
+            "left_eye_x": 0,
+            "left_eye_y": 0,
+            "left_eye_z": 0,
+            "right_eye_x": 0,
+            "right_eye_y": 0,
+            "right_eye_z": 0,
+            "nose_tip_x": 0,
+            "nose_tip_y": 0,
+            "nose_tip_z": 0,
+            "nose_bridge_x": 0,
+            "nose_bridge_y": 0,
+            "nose_bridge_z": 0,
+            "triangle_center_x": 0,
+            "triangle_center_y": 0
+          },
+          "basic_stats": {
+            "frame": {
+              "count": 99.0,
+              "mean": 470.0,
+              "std": 28.722813232690143,
+              "min": 421.0,
+              "25%": 445.5,
+              "50%": 470.0,
+              "75%": 494.5,
+              "max": 519.0
+            },
+            "leye_openness": {
+              "count": 99.0,
+              "mean": 0.14677365200906,
+              "std": 0.01538432511459133,
+              "min": 0.1096638608655679,
+              "25%": 0.1348052224603101,
+              "50%": 0.1517532195131778,
+              "75%": 0.15820223843433945,
+              "max": 0.1689409734746203
+            },
+            "reye_openness": {
+              "count": 99.0,
+              "mean": 0.056409074971862774,
+              "std": 0.01987734452754443,
+              "min": 0.027227223636758,
+              "25%": 0.045122989736963,
+              "50%": 0.0523731245778195,
+              "75%": 0.06441301995711365,
+              "max": 0.1487750872448842
+            },
+            "confidence": {
+              "count": 99.0,
+              "mean": 1.0,
+              "std": 0.0,
+              "min": 1.0,
+              "25%": 1.0,
+              "50%": 1.0,
+              "75%": 1.0,
+              "max": 1.0
+            },
+            "face_yaw": {
+              "count": 99.0,
+              "mean": 7.893939393939394,
+              "std": 0.20544535090332952,
+              "min": 7.5,
+              "25%": 8.0,
+              "50%": 8.0,
+              "75%": 8.0,
+              "max": 8.0
+            },
+            "face_pitch": {
+              "count": 99.0,
+              "mean": -14.909090909090908,
+              "std": 0.2185718529832056,
+              "min": -15.5,
+              "25%": -15.0,
+              "50%": -15.0,
+              "75%": -15.0,
+              "max": -14.5
+            },
+            "nose_length": {
+              "count": 99.0,
+              "mean": 53.31691483876054,
+              "std": 0.4122731995935024,
+              "min": 52.50887633314384,
+              "25%": 52.9818701855837,
+              "50%": 53.346650190964496,
+              "75%": 53.63161658814862,
+              "max": 54.16511646955849
+            },
+            "normal_vector": {
+              "count": 99.0,
+              "mean": 0.49512235308557023,
+              "std": 0.007143860952286569,
+              "min": 0.4760448253560882,
+              "25%": 0.49126685179418994,
+              "50%": 0.4977515804779832,
+              "75%": 0.4980318367299499,
+              "max": 0.519648330302206
+            },
+            "distance_x": {
+              "count": 99.0,
+              "mean": 15.787878787878787,
+              "std": 0.41089070180665904,
+              "min": 15.0,
+              "25%": 16.0,
+              "50%": 16.0,
+              "75%": 16.0,
+              "max": 16.0
+            },
+            "distance_y": {
+              "count": 99.0,
+              "mean": -29.818181818181817,
+              "std": 0.4371437059664112,
+              "min": -31.0,
+              "25%": -30.0,
+              "50%": -30.0,
+              "75%": -30.0,
+              "max": -29.0
+            },
+            "triangle_area": {
+              "count": 99.0,
+              "mean": 2270.90404040404,
+              "std": 44.717918426582806,
+              "min": 2169.5,
+              "25%": 2243.25,
+              "50%": 2265.0,
+              "75%": 2301.0,
+              "max": 2362.0
+            },
+            "eye_distance": {
+              "count": 99.0,
+              "mean": 104.32910045895876,
+              "std": 0.772228058099624,
+              "min": 103.0194156457898,
+              "25%": 104.01922899156676,
+              "50%": 104.04326023342406,
+              "75%": 105.03094714587766,
+              "max": 106.04244433244644
+            },
+            "eye_roi_width": {
+              "count": 99.0,
+              "mean": 77.29292929292929,
+              "std": 0.9609999602085962,
+              "min": 76.0,
+              "25%": 76.0,
+              "50%": 78.0,
+              "75%": 78.0,
+              "max": 78.0
+            },
+            "eye_roi_height": {
+              "count": 99.0,
+              "mean": 46.0,
+              "std": 0.0,
+              "min": 46.0,
+              "25%": 46.0,
+              "50%": 46.0,
+              "75%": 46.0,
+              "max": 46.0
+            },
+            "left_eye_x": {
+              "count": 99.0,
+              "mean": 0.471816270038335,
+              "std": 0.0012663511313453753,
+              "min": 0.4694239497184753,
+              "25%": 0.470867782831192,
+              "50%": 0.4716717302799225,
+              "75%": 0.4726407080888748,
+              "max": 0.4757062494754791
+            },
+            "left_eye_y": {
+              "count": 99.0,
+              "mean": 0.49949938570610203,
+              "std": 0.0023712192422712048,
+              "min": 0.4946314692497253,
+              "25%": 0.4979264587163925,
+              "50%": 0.4984723329544067,
+              "75%": 0.5008436739444733,
+              "max": 0.5061100721359253
+            },
+            "left_eye_z": {
+              "count": 99.0,
+              "mean": -0.00928812807971475,
+              "std": 0.0007680600012615437,
+              "min": -0.0110125616192817,
+              "25%": -0.00987289892509575,
+              "50%": -0.0092209866270422,
+              "75%": -0.00873280828818675,
+              "max": -0.0078526362776756
+            },
+            "right_eye_x": {
+              "count": 99.0,
+              "mean": 0.6347258385985789,
+              "std": 0.0013511833777550587,
+              "min": 0.6326637268066406,
+              "25%": 0.633656769990921,
+              "50%": 0.6345040798187256,
+              "75%": 0.6357298493385315,
+              "max": 0.6382139921188354
+            },
+            "right_eye_y": {
+              "count": 99.0,
+              "mean": 0.5051573150687747,
+              "std": 0.002499585412326514,
+              "min": 0.499146044254303,
+              "25%": 0.5033530592918396,
+              "50%": 0.504249632358551,
+              "75%": 0.5071262419223785,
+              "max": 0.5101801753044128
+            },
+            "right_eye_z": {
+              "count": 99.0,
+              "mean": 0.04567984009932985,
+              "std": 0.0005770131047441952,
+              "min": 0.0439108535647392,
+              "25%": 0.0453202296048402,
+              "50%": 0.0456530563533306,
+              "75%": 0.046053940430283505,
+              "max": 0.0470584630966186
+            },
+            "nose_tip_x": {
+              "count": 99.0,
+              "mean": 0.5894246119441409,
+              "std": 0.001195070915934277,
+              "min": 0.5870431661605835,
+              "25%": 0.5886629819869995,
+              "50%": 0.589280903339386,
+              "75%": 0.5904112160205841,
+              "max": 0.5917890667915344
+            },
+            "nose_tip_y": {
+              "count": 99.0,
+              "mean": 0.5942358344492286,
+              "std": 0.0031174325229153315,
+              "min": 0.5902769565582275,
+              "25%": 0.5918091237545013,
+              "50%": 0.5927426218986511,
+              "75%": 0.5964398682117462,
+              "max": 0.6013720035552979
+            },
+            "nose_tip_z": {
+              "count": 99.0,
+              "mean": -0.05532164352409764,
+              "std": 0.0002552099967230695,
+              "min": -0.055946908891201,
+              "25%": -0.0555145181715488,
+              "50%": -0.0553066246211528,
+              "75%": -0.055155288428068105,
+              "max": -0.0546424351632595
+            },
+            "nose_bridge_x": {
+              "count": 99.0,
+              "mean": 0.5727685593595409,
+              "std": 0.0012493942188132646,
+              "min": 0.5706846117973328,
+              "25%": 0.5716710686683655,
+              "50%": 0.5726050734519958,
+              "75%": 0.5738113820552826,
+              "max": 0.575452983379364
+            },
+            "nose_bridge_y": {
+              "count": 99.0,
+              "mean": 0.4854029209324808,
+              "std": 0.002512039219213482,
+              "min": 0.4827145338058471,
+              "25%": 0.48360078036785126,
+              "50%": 0.4841505885124206,
+              "75%": 0.48679502308368683,
+              "max": 0.4921501874923706
+            },
+            "nose_bridge_z": {
+              "count": 99.0,
+              "mean": -0.018999606427369652,
+              "std": 0.0006596237474719562,
+              "min": -0.020503282546997,
+              "25%": -0.01942275464534755,
+              "50%": -0.0189985651522874,
+              "75%": -0.01856277417391535,
+              "max": -0.0176051668822765
+            },
+            "triangle_center_x": {
+              "count": 99.0,
+              "mean": 360.93939393939394,
+              "std": 0.8183879352825013,
+              "min": 360.0,
+              "25%": 360.0,
+              "50%": 361.0,
+              "75%": 362.0,
+              "max": 363.0
+            },
+            "triangle_center_y": {
+              "count": 99.0,
+              "mean": 254.94949494949495,
+              "std": 1.32767817416643,
+              "min": 253.0,
+              "25%": 254.0,
+              "50%": 254.0,
+              "75%": 256.0,
+              "max": 258.0
+            }
+          },
+          "sample": [
+            {
+              "frame": 421,
+              "leye_openness": 0.1219402569469007,
+              "reye_openness": 0.0635079375409826,
+              "confidence": 1.0,
+              "face_yaw": 8.0,
+              "face_pitch": -15.0,
+              "nose_length": 53.30262984664413,
+              "normal_vector": 0.501571896984779,
+              "distance_x": 16,
+              "distance_y": -30,
+              "triangle_area": 2362.0,
+              "eye_distance": 106.01886624558855,
+              "sunglasses_detected": false,
+              "eye_roi_width": 78,
+              "eye_roi_height": 46,
+              "left_eye_x": 0.4727240800857544,
+              "left_eye_y": 0.5061100721359253,
+              "left_eye_z": -0.0100769931450486,
+              "right_eye_x": 0.637573778629303,
+              "right_eye_y": 0.5100253224372864,
+              "right_eye_z": 0.045352891087532,
+              "nose_tip_x": 0.5911133885383606,
+              "nose_tip_y": 0.6010187268257141,
+              "nose_tip_z": -0.0555156208574771,
+              "nose_bridge_x": 0.574696958065033,
+              "nose_bridge_y": 0.4921501874923706,
+              "nose_bridge_z": -0.0199298355728387,
+              "triangle_center_x": 362,
+              "triangle_center_y": 258
+            },
+            {
+              "frame": 422,
+              "leye_openness": 0.1142260593410437,
+              "reye_openness": 0.065352325894392,
+              "confidence": 1.0,
+              "face_yaw": 7.5,
+              "face_pitch": -15.0,
+              "nose_length": 53.4229185741697,
+              "normal_vector": 0.5064997682508064,
+              "distance_x": 15,
+              "distance_y": -30,
+              "triangle_area": 2340.0,
+              "eye_distance": 105.01904589168576,
+              "sunglasses_detected": false,
+              "eye_roi_width": 78,
+              "eye_roi_height": 46,
+              "left_eye_x": 0.474064826965332,
+              "left_eye_y": 0.5053611993789673,
+              "left_eye_z": -0.0106848254799842,
+              "right_eye_x": 0.6382139921188354,
+              "right_eye_y": 0.5101801753044128,
+              "right_eye_z": 0.045120645314455,
+              "nose_tip_x": 0.5915806889533997,
+              "nose_tip_y": 0.6002128720283508,
+              "nose_tip_z": -0.0555144697427749,
+              "nose_bridge_x": 0.575452983379364,
+              "nose_bridge_y": 0.4910122156143188,
+              "nose_bridge_z": -0.020503282546997,
+              "triangle_center_x": 363,
+              "triangle_center_y": 258
+            },
+            {
+              "frame": 423,
+              "leye_openness": 0.121132750102033,
+              "reye_openness": 0.0530014291745768,
+              "confidence": 1.0,
+              "face_yaw": 8.0,
+              "face_pitch": -15.0,
+              "nose_length": 53.860771955047845,
+              "normal_vector": 0.501571896984779,
+              "distance_x": 16,
+              "distance_y": -30,
+              "triangle_area": 2362.0,
+              "eye_distance": 106.01886624558855,
+              "sunglasses_detected": false,
+              "eye_roi_width": 78,
+              "eye_roi_height": 46,
+              "left_eye_x": 0.4731276035308838,
+              "left_eye_y": 0.5050232410430908,
+              "left_eye_z": -0.0106366164982318,
+              "right_eye_x": 0.6378088593482971,
+              "right_eye_y": 0.5100474953651428,
+              "right_eye_z": 0.0445516929030418,
+              "nose_tip_x": 0.5908428430557251,
+              "nose_tip_y": 0.6013720035552979,
+              "nose_tip_z": -0.0555463284254074,
+              "nose_bridge_x": 0.5746937394142151,
+              "nose_bridge_y": 0.4912473559379577,
+              "nose_bridge_z": -0.0205019768327474,
+              "triangle_center_x": 362,
+              "triangle_center_y": 258
+            },
+            {
+              "frame": 424,
+              "leye_openness": 0.1226827771274791,
+              "reye_openness": 0.0587429530590805,
+              "confidence": 1.0,
+              "face_yaw": 8.0,
+              "face_pitch": -15.0,
+              "nose_length": 53.407098426258834,
+              "normal_vector": 0.501571896984779,
+              "distance_x": 16,
+              "distance_y": -30,
+              "triangle_area": 2362.0,
+              "eye_distance": 106.01886624558855,
+              "sunglasses_detected": false,
+              "eye_roi_width": 78,
+              "eye_roi_height": 46,
+              "left_eye_x": 0.4723474383354187,
+              "left_eye_y": 0.5045567154884338,
+              "left_eye_z": -0.010218683630228,
+              "right_eye_x": 0.6381005048751831,
+              "right_eye_y": 0.5097149014472961,
+              "right_eye_z": 0.0450033098459243,
+              "nose_tip_x": 0.5908761620521545,
+              "nose_tip_y": 0.6000276207923889,
+              "nose_tip_z": -0.0554568283259868,
+              "nose_bridge_x": 0.5744764804840088,
+              "nose_bridge_y": 0.4909326136112213,
+              "nose_bridge_z": -0.0199954565614461,
+              "triangle_center_x": 362,
+              "triangle_center_y": 258
+            },
+            {
+              "frame": 425,
+              "leye_openness": 0.1280305880390369,
+              "reye_openness": 0.0643336659548646,
+              "confidence": 1.0,
+              "face_yaw": 8.0,
+              "face_pitch": -15.0,
+              "nose_length": 53.30814472668583,
+              "normal_vector": 0.501571896984779,
+              "distance_x": 16,
+              "distance_y": -30,
+              "triangle_area": 2362.0,
+              "eye_distance": 106.01886624558855,
+              "sunglasses_detected": false,
+              "eye_roi_width": 78,
+              "eye_roi_height": 46,
+              "left_eye_x": 0.4719894230365753,
+              "left_eye_y": 0.5043251514434814,
+              "left_eye_z": -0.0106337005272507,
+              "right_eye_x": 0.637606680393219,
+              "right_eye_y": 0.5100131630897522,
+              "right_eye_z": 0.0449202060699462,
+              "nose_tip_x": 0.5911291837692261,
+              "nose_tip_y": 0.6000531315803528,
+              "nose_tip_z": -0.0550935715436935,
+              "nose_bridge_x": 0.5751237869262695,
+              "nose_bridge_y": 0.4910641312599182,
+              "nose_bridge_z": -0.0203126855194568,
+              "triangle_center_x": 362,
+              "triangle_center_y": 258
+            }
+          ]
+        }
+      },
+      "plots": {
+        "1": "1_timeseries.png",
+        "WIN_20250819_10_10_42_Pro_analysis": "WIN_20250819_10_10_42_Pro_analysis_timeseries.png"
+      },
+      "column_info": {
+        "spec_results": [
+          {
+            "content": "# Evaluation Engine\n\nThis module evaluates the drowsy_detection algorithm using core library outputs stored in ../DataWareHouse.\n\n- Input scope: ../DataWareHouse/02_core_lib_output\n- Per-video algorithm outputs: ../DataWareHouse/03_algorithm_output/{algorithm_version}/{video_name}_result.csv\n- Per-run evaluation results: results/{run_id}/summary.csv and results/{run_id}/{data_name}.csv\n\nRun:\n```powershell\nuv run python evaluation_engine/run_evaluation.py\n```",
+            "metadata": {
+              "source": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md",
+              "segment": "evaluation_specs",
+              "chunk_id": 0,
+              "file_hash": "1ce379a642b57d63a6ecea7a62792b89"
+            },
+            "score": 1.687123417854309,
+            "segment": "evaluation_specs",
+            "source": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\external\\drowsy_detection\\evaluation_engine\\README.md"
+          }
+        ],
+        "inferred_columns": {}
+      },
+      "column_mapping": {
+        "column_mapping": {
+          "input": {},
+          "output": {},
+          "thresholds": {
+            "leye_openness_threshold": 0.0,
+            "reye_openness_threshold": 0.0,
+            "confidence_threshold": 0.0,
+            "close_threshold": 0.5
+          }
+        }
+      },
+      "representative_stats": {
+        "1": {
+          "frame_num": {
+            "mean": 470.0,
+            "median": 470.0,
+            "min": 421.0,
+            "max": 519.0
+          },
+          "is_drowsy": {
+            "mean": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "continuous_time": {
+            "mean": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          }
+        },
+        "WIN_20250819_10_10_42_Pro_analysis": {
+          "frame": {
+            "mean": 470.0,
+            "median": 470.0,
+            "min": 421.0,
+            "max": 519.0
+          },
+          "leye_openness": {
+            "mean": 0.147,
+            "median": 0.152,
+            "min": 0.11,
+            "max": 0.169
+          },
+          "reye_openness": {
+            "mean": 0.056,
+            "median": 0.052,
+            "min": 0.027,
+            "max": 0.149
+          },
+          "confidence": {
+            "mean": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "max": 1.0
+          },
+          "face_yaw": {
+            "mean": 7.894,
+            "median": 8.0,
+            "min": 7.5,
+            "max": 8.0
+          },
+          "face_pitch": {
+            "mean": -14.909,
+            "median": -15.0,
+            "min": -15.5,
+            "max": -14.5
+          },
+          "nose_length": {
+            "mean": 53.317,
+            "median": 53.347,
+            "min": 52.509,
+            "max": 54.165
+          },
+          "normal_vector": {
+            "mean": 0.495,
+            "median": 0.498,
+            "min": 0.476,
+            "max": 0.52
+          },
+          "distance_x": {
+            "mean": 15.788,
+            "median": 16.0,
+            "min": 15.0,
+            "max": 16.0
+          },
+          "distance_y": {
+            "mean": -29.818,
+            "median": -30.0,
+            "min": -31.0,
+            "max": -29.0
+          },
+          "triangle_area": {
+            "mean": 2270.904,
+            "median": 2265.0,
+            "min": 2169.5,
+            "max": 2362.0
+          },
+          "eye_distance": {
+            "mean": 104.329,
+            "median": 104.043,
+            "min": 103.019,
+            "max": 106.042
+          },
+          "eye_roi_width": {
+            "mean": 77.293,
+            "median": 78.0,
+            "min": 76.0,
+            "max": 78.0
+          },
+          "eye_roi_height": {
+            "mean": 46.0,
+            "median": 46.0,
+            "min": 46.0,
+            "max": 46.0
+          },
+          "left_eye_x": {
+            "mean": 0.472,
+            "median": 0.472,
+            "min": 0.469,
+            "max": 0.476
+          },
+          "left_eye_y": {
+            "mean": 0.499,
+            "median": 0.498,
+            "min": 0.495,
+            "max": 0.506
+          },
+          "left_eye_z": {
+            "mean": -0.009,
+            "median": -0.009,
+            "min": -0.011,
+            "max": -0.008
+          },
+          "right_eye_x": {
+            "mean": 0.635,
+            "median": 0.635,
+            "min": 0.633,
+            "max": 0.638
+          },
+          "right_eye_y": {
+            "mean": 0.505,
+            "median": 0.504,
+            "min": 0.499,
+            "max": 0.51
+          },
+          "right_eye_z": {
+            "mean": 0.046,
+            "median": 0.046,
+            "min": 0.044,
+            "max": 0.047
+          },
+          "nose_tip_x": {
+            "mean": 0.589,
+            "median": 0.589,
+            "min": 0.587,
+            "max": 0.592
+          },
+          "nose_tip_y": {
+            "mean": 0.594,
+            "median": 0.593,
+            "min": 0.59,
+            "max": 0.601
+          },
+          "nose_tip_z": {
+            "mean": -0.055,
+            "median": -0.055,
+            "min": -0.056,
+            "max": -0.055
+          },
+          "nose_bridge_x": {
+            "mean": 0.573,
+            "median": 0.573,
+            "min": 0.571,
+            "max": 0.575
+          },
+          "nose_bridge_y": {
+            "mean": 0.485,
+            "median": 0.484,
+            "min": 0.483,
+            "max": 0.492
+          },
+          "nose_bridge_z": {
+            "mean": -0.019,
+            "median": -0.019,
+            "min": -0.021,
+            "max": -0.018
+          },
+          "triangle_center_x": {
+            "mean": 360.939,
+            "median": 361.0,
+            "min": 360.0,
+            "max": 363.0
+          },
+          "triangle_center_y": {
+            "mean": 254.949,
+            "median": 254.0,
+            "min": 253.0,
+            "max": 258.0
+          }
+        }
+      },
+      "evaluation_interval": {
+        "start": 421,
+        "end": 519,
+        "task_id": "1_4",
+        "video_ID": 1,
+        "tag_ID": 4
+      }
+    }
+  },
+  "hypotheses": {
+    "1_4": []
+  },
+  "final_reports": [],
+  "errors": [],
+  "start_time": "2025-10-02T13:58:28.301812",
+  "end_time": "2025-10-02T14:00:15.836500",
+  "output_dir": "C:\\workspace\\ImproveAlgorithmDevelopment\\ai_analysis_engine\\outputs\\analysis_report_20251002_135827"
+}

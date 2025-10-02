@@ -1,0 +1,167 @@
+2025-10-02 14:11:44,739 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 14:11:44,739 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 9
+2025-10-02 14:11:44,772 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 14:11:44,773 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 14:11:44,774 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 14:11:44,775 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 14:11:44,776 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 14:11:44,776 - ai_analysis_engine.performance_analyzer.performance_analyzer - INFO - Starting performance analysis
+2025-10-02 14:11:45,217 - ai_analysis_engine.performance_analyzer.performance_analyzer - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 14:11:45,217 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 14:11:45,218 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-10-02 14:11:45,218 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Starting legacy instance analysis via adapter
+2025-10-02 14:11:45,218 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - evaluation_data keys: ['metadata', 'data', 'evaluation_result_id', 'algorithm_outputs', 'core_outputs']
+2025-10-02 14:11:45,221 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Initializing AI Analysis Engine...
+2025-10-02 14:11:45,543 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Initialized all workflow nodes
+2025-10-02 14:11:45,556 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Built and compiled LangGraph workflow
+2025-10-02 14:11:45,556 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - AI Analysis Engine initialized successfully
+2025-10-02 14:11:45,557 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: algorithm_specs
+2025-10-02 14:11:45,576 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for algorithm_specs
+2025-10-02 14:11:45,577 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: algorithm_codes
+2025-10-02 14:11:45,578 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for algorithm_codes
+2025-10-02 14:11:45,579 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: evaluation_specs
+2025-10-02 14:11:45,580 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for evaluation_specs
+2025-10-02 14:11:45,580 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: evaluation_codes
+2025-10-02 14:11:45,581 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for evaluation_codes
+2025-10-02 14:11:45,582 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df type: <class 'pandas.core.frame.DataFrame'>, is None: False
+2025-10-02 14:11:45,582 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df columns: ['task_id', 'video_ID', 'tag_ID', 'task_ID', 'start', 'end', 'expected_is_drowsy', 'is_drowsy', 'is_correct', 'algorithm_output_ID', 'algorithm_output_dir', 'core_lib_output_ID', 'core_lib_output_dir', 'video_dir']
+2025-10-02 14:11:45,582 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - eval_df shape: (20, 14)
+2025-10-02 14:11:45,583 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Processing expected_is_drowsy column
+2025-10-02 14:11:45,583 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - is_correct values: {0: 11, 1: 9}
+2025-10-02 14:11:45,584 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Filtering to failed tasks only: 11 failed tasks out of 20 total tasks
+2025-10-02 14:11:45,592 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - Before expansion - algorithm_outputs: 11, core_outputs: 11, expected_results: 11
+2025-10-02 14:11:45,593 - ai_analysis_engine.instance_analyzer.instance_analyzer - INFO - After expansion - algorithm_outputs: 11, core_outputs: 11, expected_results: 11
+2025-10-02 14:11:45,594 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Created analysis request with 1 datasets
+2025-10-02 14:11:45,594 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Starting analysis workflow...
+2025-10-02 14:11:45,594 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Starting analysis workflow
+2025-10-02 14:11:45,597 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Starting initialization
+2025-10-02 14:11:45,598 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: algorithm_specs
+2025-10-02 14:11:45,598 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for algorithm_specs
+2025-10-02 14:11:45,599 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: evaluation_specs
+2025-10-02 14:11:45,599 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for evaluation_specs
+2025-10-02 14:11:45,600 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: algorithm_code
+2025-10-02 14:11:45,609 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for algorithm_code
+2025-10-02 14:11:45,617 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Initializing vector store for segment: evaluation_code
+2025-10-02 14:11:45,617 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.rag_tool - INFO - Loading existing vector store for evaluation_code
+2025-10-02 14:11:45,618 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Initialization completed successfully
+2025-10-02 14:11:45,619 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Supervisor processing
+2025-10-02 14:11:45,619 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Next step: data_checker for dataset 1_4
+2025-10-02 14:11:45,620 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Data checker processing
+2025-10-02 14:11:45,620 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - 
+
+
+======
+
+
+
+2025-10-02 14:11:45,622 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully read CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\03_algorithm_output\v0.1.1+fa5172ba\20250922-133705\51\1.csv with 1041 rows
+2025-10-02 14:11:45,622 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Loaded CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\03_algorithm_output\v0.1.1+fa5172ba\20250922-133705\51\1.csv with shape (1041, 6)
+2025-10-02 14:11:45,627 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully read CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\02_core_lib_output\v1.0.0\1\WIN_20250819_10_10_42_Pro_analysis.csv with 1041 rows
+2025-10-02 14:11:45,628 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Loaded CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\02_core_lib_output\v1.0.0\1\WIN_20250819_10_10_42_Pro_analysis.csv with shape (1041, 29)
+2025-10-02 14:11:45,628 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Loaded 2 dataframes: ['1', 'WIN_20250819_10_10_42_Pro_analysis']
+2025-10-02 14:11:45,629 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Analyzing dataframe 1 with shape (99, 6)
+2025-10-02 14:11:45,635 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Computed representative stats for 1: ['frame_num', 'is_drowsy', 'continuous_time']
+2025-10-02 14:11:45,636 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Analyzing dataframe WIN_20250819_10_10_42_Pro_analysis with shape (99, 29)
+2025-10-02 14:11:45,658 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Computed representative stats for WIN_20250819_10_10_42_Pro_analysis: ['frame', 'leye_openness', 'reye_openness', 'confidence', 'face_yaw', 'face_pitch', 'nose_length', 'normal_vector', 'distance_x', 'distance_y', 'triangle_area', 'eye_distance', 'eye_roi_width', 'eye_roi_height', 'left_eye_x', 'left_eye_y', 'left_eye_z', 'right_eye_x', 'right_eye_y', 'right_eye_z', 'nose_tip_x', 'nose_tip_y', 'nose_tip_z', 'nose_bridge_x', 'nose_bridge_y', 'nose_bridge_z', 'triangle_center_x', 'triangle_center_y']
+2025-10-02 14:11:45,659 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Creating data plots
+2025-10-02 14:11:45,780 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Plot saved to C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\viz\1_timeseries.png
+2025-10-02 14:11:45,919 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Plot saved to C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\viz\WIN_20250819_10_10_42_Pro_analysis_timeseries.png
+2025-10-02 14:11:45,920 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Created plot paths: {'1': '1_timeseries.png', 'WIN_20250819_10_10_42_Pro_analysis': 'WIN_20250819_10_10_42_Pro_analysis_timeseries.png'}
+2025-10-02 14:11:45,920 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Getting column information from specs
+2025-10-02 14:11:45,921 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Searching for column information in specs
+2025-10-02 14:11:46,324 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Found 1 spec results
+2025-10-02 14:11:46,324 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Column info keys: ['spec_results', 'inferred_columns']
+2025-10-02 14:11:46,324 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Extracting column mapping from specs
+2025-10-02 14:11:46,325 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Searching for column information in specs
+2025-10-02 14:11:46,598 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Found 1 spec results
+2025-10-02 14:11:50,521 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['left_eye_close_threshold', 'right_eye_close_threshold', 'continuous_close_time', 'face_conf_threshold', 'is_drowsy']... (confidence: 0.9)
+2025-10-02 14:11:55,346 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['frame_num', 'left_eye_open', 'right_eye_open', 'face_confidence', 'is_drowsy']... (confidence: 0.9)
+2025-10-02 14:11:58,439 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted thresholds: ['leye_openness_threshold', 'reye_openness_threshold', 'confidence_threshold']... (confidence: 0.85)
+2025-10-02 14:11:58,440 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Extracted column mapping - input: [], output: [], thresholds: ['leye_openness_threshold', 'reye_openness_threshold', 'confidence_threshold', 'close_threshold']
+2025-10-02 14:11:58,440 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - COLUMN_MAPPING_USED - Input: {}
+2025-10-02 14:11:58,440 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - COLUMN_MAPPING_USED - Output: {}
+2025-10-02 14:11:58,441 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - COLUMN_MAPPING_USED - Thresholds: {'leye_openness_threshold': 0.0, 'reye_openness_threshold': 0.0, 'confidence_threshold': 0.0, 'close_threshold': 0.5}
+2025-10-02 14:11:58,441 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Column mapping keys: ['column_mapping']
+2025-10-02 14:11:58,441 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Storing analysis results in state
+2025-10-02 14:11:58,441 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Successfully stored results for dataset 1_4
+2025-10-02 14:11:58,441 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Data checking completed for dataset 1_4
+2025-10-02 14:11:58,442 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Supervisor processing
+2025-10-02 14:11:58,443 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Next step: consistency_checker for dataset 1_4
+2025-10-02 14:11:58,444 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Consistency checker processing
+2025-10-02 14:11:58,446 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully read CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\03_algorithm_output\v0.1.1+fa5172ba\20250922-133705\51\1.csv with 1041 rows
+2025-10-02 14:11:58,446 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Loaded CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\03_algorithm_output\v0.1.1+fa5172ba\20250922-133705\51\1.csv with shape (1041, 6)
+2025-10-02 14:11:58,451 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully read CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\02_core_lib_output\v1.0.0\1\WIN_20250819_10_10_42_Pro_analysis.csv with 1041 rows
+2025-10-02 14:11:58,451 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.tools.repl_tool - INFO - Loaded CSV C:\workspace\ImproveAlgorithmDevelopment\development_datas\02_core_lib_output\v1.0.0\1\WIN_20250819_10_10_42_Pro_analysis.csv with shape (1041, 29)
+2025-10-02 14:11:59,510 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - No frame interval found in text using LLM
+2025-10-02 14:11:59,511 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - WARNING - Frame range contains None values
+2025-10-02 14:11:59,513 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Consistency checking completed for dataset 1_4
+2025-10-02 14:11:59,514 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Supervisor processing
+2025-10-02 14:11:59,515 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Next step: hypothesis_generator for dataset 1_4
+2025-10-02 14:11:59,516 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Hypothesis generator processing
+2025-10-02 14:11:59,517 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.hypothesis_generator_agent - INFO - Generating hypotheses for dataset 1_4
+2025-10-02 14:12:02,017 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted thresholds: ['left_eye_close_threshold', 'right_eye_close_threshold', 'continuous_close_time']... (confidence: 0.85)
+2025-10-02 14:12:06,712 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['frame_num', 'left_eye_open', 'right_eye_open', 'face_confidence', 'is_drowsy']... (confidence: 0.9)
+2025-10-02 14:12:07,850 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['is_drowsy']... (confidence: 0.95)
+2025-10-02 14:12:48,254 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted JSON from text
+2025-10-02 14:12:48,255 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.hypothesis_generator_agent - INFO - Generated 0 hypotheses for dataset 1_4
+2025-10-02 14:12:48,255 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Generated 0 hypotheses for dataset 1_4
+2025-10-02 14:12:48,256 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Supervisor processing
+2025-10-02 14:12:48,257 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Next step: verifier for dataset 1_4
+2025-10-02 14:12:48,258 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Verifier processing
+2025-10-02 14:12:48,258 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Verification completed for dataset 1_4
+2025-10-02 14:12:48,259 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Reporter processing
+2025-10-02 14:12:48,260 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generating report for dataset 1_4
+2025-10-02 14:12:50,169 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted thresholds: ['left_eye_close_threshold', 'right_eye_close_threshold', 'continuous_close_time']... (confidence: 0.92)
+2025-10-02 14:12:55,994 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['frame_num', 'left_eye_open', 'right_eye_open', 'face_confidence', 'is_drowsy']... (confidence: 0.9)
+2025-10-02 14:12:57,344 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.exploration_utils - INFO - LLM extracted columns: ['is_drowsy']... (confidence: 0.95)
+2025-10-02 14:12:57,345 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Loaded algorithm spec: 4718 characters
+2025-10-02 14:12:57,345 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Loaded evaluation spec: 463 characters
+2025-10-02 14:12:57,346 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Algorithm spec preview: # 連続閉眼検知アルゴリズム仕様書 (AS_drowsy_detection)
+
+## 1. 概要・目的
+
+### 1.1 アルゴリズム名
+- 連続閉眼検知アルゴリズム (Continuous Eye Closure Detection)
+- 略称: AS_drowsy_detection
+- バージョン: v0.1.1
+
+### 1.2 目的・背景
+- 左右の目の開眼度 (0.0 = 完全閉眼 
+2025-10-02 14:12:57,346 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Evaluation spec preview: # Evaluation Engine
+
+This module evaluates the drowsy_detection algorithm using core library outputs stored in ../DataWareHouse.
+
+- Input scope: ../DataWareHouse/02_core_lib_output
+- Per-video algorit
+2025-10-02 14:12:57,347 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generating visualization plots for dataset 1_4
+2025-10-02 14:12:57,347 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - 
+
+
+======
+
+
+
+2025-10-02 14:12:58,224 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Algorithm output plot - inferred columns (attempt 1): ['is_drowsy', 'continuous_time', 'left_eye_closed', 'right_eye_closed']
+2025-10-02 14:12:59,688 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - No frame interval found in text using LLM
+2025-10-02 14:13:00,181 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generated algorithm output plot: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\viz\algorithm_output_plot.png
+2025-10-02 14:13:01,060 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Core output plot - inferred input columns (attempt 1): ['leye_openness', 'reye_openness', 'confidence']
+2025-10-02 14:13:02,373 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - No frame interval found in text using LLM
+2025-10-02 14:13:02,750 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generated algorithm output plot: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\viz\core_output_plot.png
+2025-10-02 14:13:02,751 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Found plot files in C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\viz: ['1_timeseries.png', 'algorithm_output_plot.png', 'core_output_plot.png', 'WIN_20250819_10_10_42_Pro_analysis_timeseries.png']
+2025-10-02 14:13:02,751 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Assigned plot files: algorithm='algorithm_output_plot.png', core='core_output_plot.png'
+2025-10-02 14:13:02,751 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generated plots for dataset 1_4: {'algorithm': 'algorithm_output_plot.png', 'core': 'core_output_plot.png'}
+2025-10-02 14:13:14,266 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.agents.reporter_agent - INFO - Generated report for dataset 1_4: 808 characters
+2025-10-02 14:13:14,267 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.nodes - INFO - Report generated for dataset 1_4
+2025-10-02 14:13:14,268 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.core.graph - INFO - Analysis workflow completed
+2025-10-02 14:13:14,270 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully wrote to C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\report_1_4.md
+2025-10-02 14:13:14,270 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Report saved: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\report_1_4.md
+2025-10-02 14:13:14,271 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.utils.file_utils - INFO - Successfully wrote to C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\report_1_4.md
+2025-10-02 14:13:14,272 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Report saved: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\report_1_4.md
+2025-10-02 14:13:14,275 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Dataset JSON saved: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\report_1_4\analysis_results.json
+2025-10-02 14:13:14,282 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - JSON results saved to C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\summary\analysis_results.json
+2025-10-02 14:13:14,282 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Results processing completed in C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144
+2025-10-02 14:13:14,282 - ai_analysis_engine.ai_analysis_engine.instance_analyzer.main - INFO - Analysis workflow completed successfully
+2025-10-02 14:13:14,286 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 1 instances analyzed
+2025-10-02 14:13:14,294 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141144\summary\summary.md
+2025-10-02 14:13:14,302 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=72
+2025-10-02 14:13:14,303 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

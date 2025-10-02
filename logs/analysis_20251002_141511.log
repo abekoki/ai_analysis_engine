@@ -1,0 +1,13 @@
+2025-10-02 14:15:11,626 - ai_analysis_engine.orchestrator.orchestrator - INFO - Orchestrator initialized successfully
+2025-10-02 14:15:11,627 - ai_analysis_engine.orchestrator.orchestrator - INFO - Starting analysis for evaluation_result_id: 9
+2025-10-02 14:15:11,657 - ai_analysis_engine.orchestrator.orchestrator - INFO - Task DF mode - Algorithm ID: 3
+2025-10-02 14:15:11,658 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved algorithm output for task DF: True
+2025-10-02 14:15:11,659 - ai_analysis_engine.orchestrator.orchestrator - INFO - Retrieved core output for task DF: True
+2025-10-02 14:15:11,660 - ai_analysis_engine.orchestrator.orchestrator - INFO - Loaded evaluation data: 20 records
+2025-10-02 14:15:11,660 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running performance analysis...
+2025-10-02 14:15:12,206 - ai_analysis_engine.orchestrator.orchestrator - INFO - Performance analysis completed: {'total_samples': 20, 'accuracy': 0.45, 'correct_predictions': 9, 'incorrect_predictions': 11}
+2025-10-02 14:15:12,206 - ai_analysis_engine.orchestrator.orchestrator - INFO - Running instance analysis...
+2025-10-02 14:16:50,610 - ai_analysis_engine.orchestrator.orchestrator - INFO - Instance analysis completed: 1 instances analyzed
+2025-10-02 14:16:50,618 - ai_analysis_engine.orchestrator.orchestrator - INFO - Final report generated: C:\workspace\ImproveAlgorithmDevelopment\ai_analysis_engine\outputs\analysis_report_20251002_141511\summary\summary.md
+2025-10-02 14:16:50,627 - ai_analysis_engine.orchestrator.orchestrator - INFO - Results saved to DataWareHouse: analysis_result_id=73
+2025-10-02 14:16:50,628 - ai_analysis_engine.orchestrator.orchestrator - INFO - Analysis completed successfully

@@ -8,11 +8,13 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+
+
 
 from ..config.settings import Settings
 from .config import config
-from .utils.file_utils import ensure_directory, ensure_analysis_output_structure, get_report_paths
+from .utils.file_utils import ensure_directory, ensure_analysis_output_structure, get_report_paths, write_file
 from .utils.logger import update_instance_log_file
 from .config.library_config import AnalysisConfig
 from .library_api import AIAnalysisEngine
@@ -47,45 +49,37 @@ class InstanceAnalyzer:
         algorithm_outputs_data = evaluation_data.get("algorithm_outputs", [])
         core_outputs_data = evaluation_data.get("core_outputs", [])
 
-        # データオブジェクトからCSVファイルパスを抽出
-        algorithm_outputs = []
-        core_outputs = []
+        # データオブジェクトからCSVディレクトリ情報を抽出し、IDとのマッピングを構築
+        algorithm_outputs: List[str] = []
+        core_outputs: List[str] = []
+        algo_dirs_by_id: Dict[int, str] = {}
+        core_dirs_by_id: Dict[int, str] = {}
+        algo_dir_fallbacks: List[str] = []
+        core_dir_fallbacks: List[str] = []
 
         for algo_data in algorithm_outputs_data:
-            if isinstance(algo_data, dict) and 'algorithm_output_dir' in algo_data:
-                # データベースからの相対パスを絶対パスに変換
-                algo_dir = algo_data['algorithm_output_dir']
-                if not os.path.isabs(algo_dir):
-                    algo_dir = os.path.join(self.settings.get('global.database_path', '').replace('database.db', ''), algo_dir)
-                # ディレクトリ内の全CSVファイルを取得
-                if os.path.exists(algo_dir):
-                    for csv_file in os.listdir(algo_dir):
-                        if csv_file.endswith('.csv'):
-                            algorithm_outputs.append(os.path.join(algo_dir, csv_file))
+            if not isinstance(algo_data, Mapping):
+                continue
+            algo_dir_rel = algo_data.get('algorithm_output_dir')
+            if not algo_dir_rel:
+                continue
+            algo_id = self._safe_int(algo_data.get('algorithm_output_ID') or algo_data.get('algorithm_output_id'))
+            if algo_id is not None:
+                algo_dirs_by_id[algo_id] = algo_dir_rel
+            else:
+                algo_dir_fallbacks.append(algo_dir_rel)
 
         for core_data in core_outputs_data:
-            if isinstance(core_data, dict) and 'core_lib_output_dir' in core_data:
-                # データベースからの相対パスを絶対パスに変換
-                core_dir = core_data['core_lib_output_dir']
-                logger.info(f"Original core_dir: {core_dir}")
-                if not os.path.isabs(core_dir):
-                    # '../DataWareHouse/...' のようなパスは '../development_datas/...' に置換
-                    if core_dir.startswith('../DataWareHouse/'):
-                        core_dir = '../development_datas/' + core_dir[len('../DataWareHouse/'):]
-                        logger.info(f"Replaced core_dir: {core_dir}")
-                    else:
-                        # その他の相対パスの場合はデータベースディレクトリからの相対として扱う
-                        db_dir = os.path.dirname(self.settings.get('global.database_path', ''))
-                        core_dir = os.path.join(db_dir, core_dir.lstrip('../'))
-                    logger.info(f"Final core_dir: {core_dir}")
-                # ディレクトリ内の全CSVファイルを取得
-                if os.path.exists(core_dir):
-                    logger.info(f"Core dir exists, contents: {os.listdir(core_dir)}")
-                    for csv_file in os.listdir(core_dir):
-                        if csv_file.endswith('.csv'):
-                            core_outputs.append(os.path.join(core_dir, csv_file))
-                else:
-                    logger.warning(f"Core dir does not exist: {core_dir}")
+            if not isinstance(core_data, Mapping):
+                continue
+            core_dir_rel = core_data.get('core_lib_output_dir')
+            if not core_dir_rel:
+                continue
+            core_id = self._safe_int(core_data.get('core_lib_output_ID') or core_data.get('core_lib_output_id'))
+            if core_id is not None:
+                core_dirs_by_id[core_id] = core_dir_rel
+            else:
+                core_dir_fallbacks.append(core_dir_rel)
 
         # expected_results は評価データ（DataFrame）から取得
         eval_df = evaluation_data.get("data")
@@ -112,6 +106,9 @@ class InstanceAnalyzer:
             logger.warning("eval_df is None or does not have expected_is_drowsy column")
 
         if eval_df is not None and len(eval_df) > 0:
+            aligned_algorithm_outputs: List[str] = []
+            aligned_core_outputs: List[str] = []
+
             for _, row in eval_df.iterrows():
                 expected = int(row['expected_is_drowsy'])  # intに変換
                 expected_results.append(expected)
@@ -127,6 +124,46 @@ class InstanceAnalyzer:
                     'tag_ID': row.get('tag_ID')
                 } if start is not None or end is not None else None
                 evaluation_intervals.append(interval_info)
+
+                video_id = self._safe_int(row.get('video_ID'))
+                algo_id = self._safe_int(row.get('algorithm_output_ID') or row.get('algorithm_output_id'))
+                core_id = self._safe_int(row.get('core_lib_output_ID') or row.get('core_lib_output_id'))
+
+                algo_dir_rel = algo_dirs_by_id.get(algo_id)
+                if algo_dir_rel is None and isinstance(row.get('algorithm_output_dir'), str):
+                    row_algo_dir = row.get('algorithm_output_dir').strip()
+                    if row_algo_dir:
+                        algo_dir_rel = row_algo_dir
+                if algo_dir_rel is None and algo_dir_fallbacks:
+                    algo_dir_rel = algo_dir_fallbacks[0]
+
+                core_dir_rel = core_dirs_by_id.get(core_id)
+                if core_dir_rel is None and isinstance(row.get('core_lib_output_dir'), str):
+                    row_core_dir = row.get('core_lib_output_dir').strip()
+                    if row_core_dir:
+                        core_dir_rel = row_core_dir
+                if core_dir_rel is None and core_dir_fallbacks:
+                    core_dir_rel = core_dir_fallbacks[0]
+
+                if not algo_dir_rel or not core_dir_rel:
+                    raise ValueError(
+                        "Failed to resolve output directories for evaluation row",
+                        {
+                            'algorithm_output_ID': algo_id,
+                            'core_lib_output_ID': core_id,
+                            'available_algorithm_dirs': list(algo_dirs_by_id.keys()),
+                            'available_core_dirs': list(core_dirs_by_id.keys()),
+                        },
+                    )
+
+                algo_path = self._resolve_csv_within_directory(algo_dir_rel, video_id=video_id)
+                core_path = self._resolve_csv_within_directory(core_dir_rel, video_id=video_id)
+
+                aligned_algorithm_outputs.append(algo_path)
+                aligned_core_outputs.append(core_path)
+
+            algorithm_outputs = aligned_algorithm_outputs
+            core_outputs = aligned_core_outputs
         else:
             expected_results = []
         # dataset_ids を失敗タスクに基づいて生成
@@ -360,3 +397,49 @@ class InstanceAnalyzer:
         ensure_directory(str(default_dir))
         self.output_base_dir = default_dir
         return default_dir
+
+    def _safe_int(self, value: Any) -> Optional[int]:
+        """Return value cast to int when possible, otherwise None."""
+        try:
+            if value is None:
+                return None
+            if isinstance(value, float) and not float(value).is_integer():
+                return None
+            return int(value)
+        except (ValueError, TypeError):
+            return None
+
+    def _resolve_csv_within_directory(self, relative_path: str, *, video_id: Optional[int] = None) -> str:
+        """Resolve a CSV path within a directory (or direct file) relative to the database path."""
+        db_path = self.settings.get('global.database_path')
+        if not db_path:
+            raise ValueError("global.database_path is not configured")
+
+        root_dir = Path(db_path).resolve().parent
+        target_path = (root_dir / relative_path).resolve()
+
+        if not target_path.exists():
+            raise FileNotFoundError(f"CSV path not found: {target_path}")
+
+        if target_path.is_file():
+            if target_path.suffix.lower() != '.csv':
+                raise ValueError(f"Expected CSV file but found different type: {target_path}")
+            return str(target_path)
+
+        csv_files = sorted(p for p in target_path.glob('*.csv') if p.is_file())
+        if not csv_files:
+            raise FileNotFoundError(f"No CSV files found in directory: {target_path}")
+
+        if video_id is not None:
+            target = str(video_id)
+            exact = [p for p in csv_files if p.stem == target]
+            if exact:
+                return str(exact[0])
+            prefix = [p for p in csv_files if p.stem.startswith(target + '_')]
+            if prefix:
+                return str(prefix[0])
+            contains = [p for p in csv_files if f"_{target}_" in p.stem]
+            if contains:
+                return str(contains[0])
+
+        return str(csv_files[0])

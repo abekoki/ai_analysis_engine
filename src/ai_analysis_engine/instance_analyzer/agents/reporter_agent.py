@@ -631,22 +631,31 @@ class ReporterAgent:
             filtered_core_df = filter_dataframe_by_interval(core_df, interval)
 
             algo_plot_path = plots_dir / "algorithm_output_plot.png"
-            context = {"df": filtered_algo_df}
             self._generate_algorithm_output_plot(filtered_algo_df, algorithm_config, algo_plot_path, dataset)
 
             core_plot_path = plots_dir / "core_output_plot.png"
             self._generate_core_output_plot(filtered_core_df, algorithm_config, core_plot_path, dataset)
 
-            # Check actual generated files (they might have different names)
-            actual_files = list(plots_dir.glob("*.png"))
-            logger.info(f"Found plot files in {plots_dir}: {[f.name for f in actual_files]}")
-            if actual_files:
-                # Sort files by name to ensure consistent ordering
-                actual_files.sort(key=lambda x: x.name)
-                # Assume first file is algorithm, second is core
-                plot_files["algorithm"] = actual_files[0].name if len(actual_files) > 0 else ""
-                plot_files["core"] = actual_files[1].name if len(actual_files) > 1 else ""
-                logger.info(f"Assigned plot files: algorithm='{plot_files['algorithm']}', core='{plot_files['core']}'")
+            actual_files = {p.name: p for p in plots_dir.glob("*.png")}
+            logger.info(f"Found plot files in {plots_dir}: {list(actual_files.keys())}")
+
+            # Prefer explicitly generated filenames; fallback to pattern matching
+            algo_file = "algorithm_output_plot.png"
+            core_file = "core_output_plot.png"
+
+            if algo_file not in actual_files:
+                candidates = sorted([name for name in actual_files if "algorithm" in name and name.endswith(".png")])
+                if candidates:
+                    algo_file = candidates[0]
+
+            if core_file not in actual_files:
+                candidates = sorted([name for name in actual_files if "core" in name and name.endswith(".png")])
+                if candidates:
+                    core_file = candidates[0]
+
+            plot_files["algorithm"] = algo_file if algo_file in actual_files else ""
+            plot_files["core"] = core_file if core_file in actual_files else ""
+            logger.info(f"Assigned plot files: algorithm='{plot_files['algorithm']}', core='{plot_files['core']}'")
 
             logger.info(f"Generated plots for dataset {dataset.id}: {plot_files}")
         except Exception as e:
@@ -1345,12 +1354,12 @@ plt.tight_layout()
         core_plot_b64 = ""
 
         if plot_files.get("algorithm"):
-            algorithm_plot_link = f"images/{plot_files['algorithm']}"
+            algorithm_plot_link = f"viz/{plot_files['algorithm']}"
             algorithm_plot_path = dataset_dirs["images"] / plot_files["algorithm"]
             algorithm_plot_b64 = encode_file_to_base64(algorithm_plot_path)
 
         if plot_files.get("core"):
-            core_plot_link = f"images/{plot_files['core']}"
+            core_plot_link = f"viz/{plot_files['core']}"
             core_plot_path = dataset_dirs["images"] / plot_files["core"]
             core_plot_b64 = encode_file_to_base64(core_plot_path)
 
