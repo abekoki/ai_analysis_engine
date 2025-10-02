@@ -2,7 +2,7 @@
 Data Checker Agent - Analyzes and validates input data
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
@@ -12,11 +12,13 @@ from ..models.state import AnalysisState, DatasetInfo
 from ..tools.rag_tool import RAGTool
 from ..tools.repl_tool import REPLTool
 from ..utils.logger import get_logger
+from .reporting_mixins import PromptLoggingMixin
+from ..utils.context_recorder import AgentInteractionLogger
 
 logger = get_logger(__name__)
 
 
-class DataCheckerAgent:
+class DataCheckerAgent(PromptLoggingMixin):
     """
     Agent for checking and analyzing input data
     """
@@ -86,6 +88,8 @@ class DataCheckerAgent:
 - create_plot: グラフ作成
 """)
 
+        self.prompter = AgentInteractionLogger("data_checker_agent")
+
     def analyze_data(self, dataset: DatasetInfo) -> Dict[str, Any]:
         """
         Analyze the given dataset using dynamic algorithm configuration
@@ -136,11 +140,34 @@ class DataCheckerAgent:
                 **algorithm_context
             })
 
+            self._log_prompt(
+                node="data_checker",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+                prompt_context={
+                    "dataset_info": dataset_info,
+                    "algorithm_context": algorithm_context,
+                },
+            )
+
+            self._log_response(
+                node="data_checker",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+            )
+
             # Process tool calls if any
             if hasattr(response, 'tool_calls') and response.tool_calls:
                 results = self._execute_tools(response.tool_calls, dataset)
             else:
                 results = {"llm_analysis": response.content}
+
+            self._log_result(
+                node="data_checker",
+                dataset_id=getattr(dataset, "id", None),
+                result=results,
+                description="Data checker primary analysis",
+            )
 
             # Add basic data analysis
             basic_analysis = self._perform_basic_analysis(dataset, algorithm_config)
@@ -148,6 +175,13 @@ class DataCheckerAgent:
 
             # Add algorithm configuration info
             results["algorithm_config"] = algorithm_config.model_dump()
+
+            self._log_result(
+                node="data_checker",
+                dataset_id=getattr(dataset, "id", None),
+                result=results,
+                description="Data checker final results",
+            )
 
             logger.info(f"Data analysis completed for dataset {dataset.id}")
             return results
@@ -455,3 +489,6 @@ plt.tight_layout()
                 results[f'error_{tool_call["name"]}'] = str(e)
 
         return results
+
+    # PromptLoggingMixin already provides message extraction helper
+    pass

@@ -12,11 +12,13 @@ from ..models.types import Hypothesis, HypothesisType
 from ..tools.rag_tool import RAGTool
 from ..utils.logger import get_logger
 from ..utils.exploration_utils import extract_json_with_llm
+from ..utils.context_recorder import AgentInteractionLogger
+from .reporting_mixins import PromptLoggingMixin
 
 logger = get_logger(__name__)
 
 
-class HypothesisGeneratorAgent:
+class HypothesisGeneratorAgent(PromptLoggingMixin):
     """
     Agent for generating hypotheses about potential issues in the data
     """
@@ -29,6 +31,7 @@ class HypothesisGeneratorAgent:
         )
 
         self.rag_tool = RAGTool()
+        self.prompter = AgentInteractionLogger("hypothesis_generator_agent")
 
         self.prompt = ChatPromptTemplate.from_template("""
 あなたは汎用仮説生成エージェントです。解析手順詳細.mdの「5. 未検知の原因特定」に基づいて、アルゴリズム仕様を理解し、データ分析結果から未検知の根本原因を特定します。
@@ -175,8 +178,33 @@ class HypothesisGeneratorAgent:
                 **algorithm_context
             })
 
+            self._log_prompt(
+                node="hypothesis_generator",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+                prompt_context={
+                    "dataset_info": dataset_info,
+                    "analysis_summary": analysis_summary,
+                    "consistency_summary": consistency_summary,
+                    "algorithm_context": algorithm_context,
+                },
+            )
+
+            self._log_response(
+                node="hypothesis_generator",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+            )
+
             # Parse hypotheses from response
             hypotheses = self._parse_hypotheses(response.content)
+
+            self._log_result(
+                node="hypothesis_generator",
+                dataset_id=getattr(dataset, "id", None),
+                result=[h.model_dump() if hasattr(h, "model_dump") else h for h in hypotheses],
+                description="Primary hypotheses from LLM",
+            )
 
             # Add rule-based hypotheses with algorithm context
             rule_based = self._generate_rule_based_hypotheses(
@@ -187,6 +215,13 @@ class HypothesisGeneratorAgent:
             # Remove duplicates and sort by confidence
             unique_hypotheses = self._deduplicate_hypotheses(hypotheses)
             unique_hypotheses.sort(key=lambda h: h.confidence_score, reverse=True)
+
+            self._log_result(
+                node="hypothesis_generator",
+                dataset_id=getattr(dataset, "id", None),
+                result=[h.model_dump() for h in unique_hypotheses],
+                description="Final hypotheses after deduplication",
+            )
 
             logger.info(f"Generated {len(unique_hypotheses)} hypotheses for dataset {dataset.id}")
             return unique_hypotheses

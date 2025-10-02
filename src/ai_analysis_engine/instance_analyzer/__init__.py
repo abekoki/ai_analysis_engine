@@ -17,6 +17,7 @@ from .exceptions import (
     ResourceError,
     InitializationError
 )
+from .utils.context_recorder import context_recorder, AgentInteractionLogger
 
 # 後方互換性のためのインポート
 from .main import AIAnalysisEngine as _InternalEngine
@@ -47,5 +48,7 @@ __all__ = [
 
     # 後方互換性
     "_InternalEngine",
-    "_internal_config"
+    "_internal_config",
+    "context_recorder",
+    "AgentInteractionLogger",
 ]

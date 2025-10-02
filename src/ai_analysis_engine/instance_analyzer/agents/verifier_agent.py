@@ -12,11 +12,13 @@ from ..models.types import Hypothesis, VerificationResult
 from ..tools.repl_tool import REPLTool
 from ..tools.rag_tool import RAGTool
 from ..utils.logger import get_logger
+from ..utils.context_recorder import AgentInteractionLogger
+from .reporting_mixins import PromptLoggingMixin
 
 logger = get_logger(__name__)
 
 
-class VerifierAgent:
+class VerifierAgent(PromptLoggingMixin):
     """
     Agent for verifying hypotheses through testing and validation
     """
@@ -31,6 +33,7 @@ class VerifierAgent:
         self.repl_tool = REPLTool()
         self.rag_tool = RAGTool()
         self.max_iterations = config.langgraph.max_iterations
+        self.prompter = AgentInteractionLogger("verifier_agent")
 
         self.prompt = ChatPromptTemplate.from_template("""
 あなたは汎用検証エージェントです。解析手順詳細.mdの「4. アルゴリズムの挙動分析」に基づいて、アルゴリズム仕様を理解し、仮説をテストして検証します。
@@ -251,6 +254,20 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
 
         try:
             response = self.llm.invoke(plan_prompt)
+            self._log_prompt(
+                node="verifier_plan",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+                prompt_context={
+                    "hypothesis_id": hypothesis.id,
+                    "dataset_info": dataset_info,
+                },
+            )
+            self._log_response(
+                node="verifier_plan",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+            )
             return response.content.strip()
         except Exception as e:
             logger.warning(f"Failed to generate verification plan: {e}")

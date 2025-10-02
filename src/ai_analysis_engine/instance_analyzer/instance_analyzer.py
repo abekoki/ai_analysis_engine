@@ -282,10 +282,23 @@ class InstanceAnalyzer:
 
             context_blob = metadata.get("langgraph_memory")
             if context_blob:
-                context_file = paths["contexts"] / f"graph_state_{dataset_id or 'unknown'}.json"
+                events = context_blob.get("events") if isinstance(context_blob, dict) else None
+                checkpointer_dump = context_blob.get("checkpointer") if isinstance(context_blob, dict) else None
+
+                base_name = dataset_id or "unknown"
+                events_file = paths["contexts"] / f"langgraph_events_{base_name}.json"
+                checkpoint_file = paths["contexts"] / f"langgraph_checkpointer_{base_name}.json"
+
                 try:
-                    write_file(str(context_file), json.dumps(context_blob, ensure_ascii=False, indent=2))
-                    self.logger.info(f"LangGraph context saved: {context_file}")
+                    if events is not None:
+                        write_file(str(events_file), json.dumps(events, ensure_ascii=False, indent=2))
+                        self.logger.info(f"LangGraph events saved: {events_file}")
+                    else:
+                        self.logger.debug("No LangGraph events available to save for %s", dataset_id)
+
+                    if checkpointer_dump:
+                        write_file(str(checkpoint_file), json.dumps(checkpointer_dump, ensure_ascii=False, indent=2))
+                        self.logger.info(f"LangGraph checkpointer saved: {checkpoint_file}")
                 except Exception as e:
                     self.logger.warning(f"Failed to save LangGraph context for {dataset_id}: {e}")
 

@@ -218,6 +218,26 @@ class AIAnalysisEngine:
                         json.dump(dataset_serializable, f, indent=2, ensure_ascii=False, default=str)
                     self.logger.info(f"Dataset JSON saved: {dataset_json_file}")
 
+                    # Save LangGraph context details if present
+                    metadata = dataset_data.get("metadata") if isinstance(dataset_data, dict) else None
+                    langgraph_blob = metadata.get("langgraph_memory") if metadata else None
+                    if isinstance(langgraph_blob, dict):
+                        events = langgraph_blob.get("events")
+                        checkpoint = langgraph_blob.get("checkpointer")
+                        events_file = report_paths["contexts"] / f"langgraph_events_{dataset_id}.json"
+                        checkpoint_file = report_paths["contexts"] / f"langgraph_checkpointer_{dataset_id}.json"
+                        try:
+                            if events is not None:
+                                with open(events_file, "w", encoding="utf-8") as ef:
+                                    json.dump(events, ef, indent=2, ensure_ascii=False, default=str)
+                                self.logger.info(f"LangGraph events saved: {events_file}")
+                            if checkpoint:
+                                with open(checkpoint_file, "w", encoding="utf-8") as cf:
+                                    json.dump(checkpoint, cf, indent=2, ensure_ascii=False, default=str)
+                                self.logger.info(f"LangGraph checkpointer saved: {checkpoint_file}")
+                        except Exception as ctx_error:
+                            self.logger.warning(f"Failed to save LangGraph context for {dataset_id}: {ctx_error}")
+
                     per_dataset_results.append(dataset_serializable)
             else:
                 self.logger.warning("No dataset results found to save per dataset")
@@ -226,9 +246,12 @@ class AIAnalysisEngine:
 
         try:
             serializable_results = self._make_serializable(results)
-            serializable_results["datasets"] = per_dataset_results
-            if "langgraph_memory" in results:
-                serializable_results["langgraph_memory"] = results["langgraph_memory"]
+            global_langgraph = results.get("langgraph_memory")
+            if isinstance(global_langgraph, dict):
+                serializable_results["langgraph_memory"] = {
+                    "events": global_langgraph.get("events"),
+                    "checkpointer": global_langgraph.get("checkpointer"),
+                }
 
             def check_serializable(obj, path="root"):
                 if isinstance(obj, dict):

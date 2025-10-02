@@ -12,11 +12,13 @@ from ..tools.rag_tool import RAGTool
 from ..tools.repl_tool import REPLTool
 from ..utils.logger import get_logger
 from ..utils.text_utils import extract_frame_range, extract_expected_value
+from ..utils.context_recorder import AgentInteractionLogger
+from .reporting_mixins import PromptLoggingMixin
 
 logger = get_logger(__name__)
 
 
-class ConsistencyCheckerAgent:
+class ConsistencyCheckerAgent(PromptLoggingMixin):
     """
     Agent for checking consistency between data and specifications
     """
@@ -30,6 +32,7 @@ class ConsistencyCheckerAgent:
 
         self.rag_tool = RAGTool()
         self.repl_tool = REPLTool()
+        self.prompter = AgentInteractionLogger("consistency_checker_agent")
 
         self.prompt = ChatPromptTemplate.from_template("""
 あなたは整合性チェックエージェントです。アルゴリズム仕様に基づいてデータと期待値の整合性を確認してください。
@@ -124,7 +127,31 @@ class ConsistencyCheckerAgent:
                 "data_analysis": str(data_analysis)[:2000]  # Limit size
             })
 
+            self._log_prompt(
+                node="consistency_checker",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+                prompt_context={
+                    "dataset_info": dataset_info,
+                    "parsed_expectation": parsed_expectation,
+                    "data_analysis_keys": list(data_analysis.keys()) if isinstance(data_analysis, dict) else None,
+                },
+            )
+
+            self._log_response(
+                node="consistency_checker",
+                dataset_id=getattr(dataset, "id", None),
+                response=response,
+            )
+
             consistency_results["llm_assessment"] = response.content
+
+            self._log_result(
+                node="consistency_checker",
+                dataset_id=getattr(dataset, "id", None),
+                result=consistency_results,
+                description="Consistency checker aggregated results",
+            )
 
             logger.info(f"Consistency check completed for dataset {dataset.id}")
             return consistency_results

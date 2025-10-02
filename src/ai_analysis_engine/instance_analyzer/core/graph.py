@@ -2,13 +2,14 @@
 Main LangGraph workflow for AI Analysis Engine
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from ..models.state import AnalysisState
 from ..config import config
 from ..utils.logger import get_logger
+from ..utils.context_recorder import context_recorder
 from .nodes import (
     InitializationNode,
     SupervisorNode,
@@ -106,6 +107,10 @@ class AnalysisGraph:
         self.graph = workflow.compile(checkpointer=self.checkpointer)
         logger.info("Built and compiled LangGraph workflow")
 
+        # Register custom event handlers for memory capture if supported
+        if hasattr(self.graph, "add_subscriber"):
+            self.graph.add_subscriber(self._capture_checkpoint_event)
+
         return self.graph
 
     def _route_from_supervisor(self, state: AnalysisState) -> str:
@@ -181,7 +186,8 @@ class AnalysisGraph:
                 state_dict["max_instances"] = max_instances
 
             thread_id = f"analysis_{state.current_dataset_index}"
-            result = self.graph.invoke(state_dict, config={"configurable": {"thread_id": thread_id}})
+            with context_recorder.thread_scope(thread_id):
+                result = self.graph.invoke(state_dict, config={"configurable": {"thread_id": thread_id}})
 
             logger.info("Analysis workflow completed")
 
@@ -198,17 +204,72 @@ class AnalysisGraph:
                         for ds in result["datasets"]
                     ]
 
+            context_events = context_recorder.events(thread_id)
+
             if hasattr(self.graph, "checkpointer") and hasattr(self.graph.checkpointer, "memory"):
-                memory_snapshots = self.graph.checkpointer.memory.get(thread_id, {})
-                if isinstance(result, dict):
-                    result.setdefault("metadata", {})
-                    result["metadata"]["langgraph_memory"] = memory_snapshots
+                memory_snapshots = self.graph.checkpointer.memory.get(thread_id, [])
+            else:
+                memory_snapshots = []
+
+            if isinstance(result, dict):
+                result.setdefault("metadata", {})
+                result["metadata"]["langgraph_memory"] = {
+                    "events": context_events,
+                    "checkpointer": memory_snapshots,
+                }
 
             return result
 
         except Exception as e:
             logger.error(f"Analysis workflow failed: {e}")
             raise
+
+    def _capture_checkpoint_event(self, event: Dict[str, Any]) -> None:
+        """Capture LangGraph runtime events for storing agent prompts and responses."""
+        try:
+            if not isinstance(event, dict):
+                return
+
+            event_type = event.get("event")
+            if event_type not in {"before", "after"}:
+                return
+
+            thread_id = event.get("thread_id")
+            if not thread_id:
+                return
+
+            node_name = event.get("name") or event.get("node")
+            if not node_name:
+                return
+
+            timestamp = event.get("timestamp")
+            payload = event.get("payload", {})
+
+            if event_type == "before":
+                inputs = payload.get("inputs")
+                entry = {
+                    "node": node_name,
+                    "event": "before",
+                    "timestamp": timestamp,
+                    "inputs": inputs,
+                }
+            else:
+                outputs = payload.get("outputs")
+                entry = {
+                    "node": node_name,
+                    "event": "after",
+                    "timestamp": timestamp,
+                    "outputs": outputs,
+                }
+
+            context_recorder.append(entry, thread_id=thread_id)
+
+            memory = getattr(self.checkpointer, "memory", None)
+            if memory is not None:
+                thread_entries = memory.setdefault(thread_id, [])
+                thread_entries.append(entry)
+        except Exception as event_error:
+            logger.warning("Failed to capture LangGraph event: %s", event_error)
 
     def get_graph_visualization(self) -> str:
         """
