@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 from ..config import config
 from ..utils.file_utils import (
-    encode_file_to_base64,
     ensure_analysis_output_structure,
     filter_dataframe_by_interval,
     get_report_paths,
@@ -35,12 +34,6 @@ class FrameInterval(BaseModel):
     start_frame: Optional[int] = Field(None, description="Start frame number of the evaluation interval")
     end_frame: Optional[int] = Field(None, description="End frame number of the evaluation interval")
     has_interval: bool = Field(False, description="Whether a frame interval was found in the text")
-
-
-class PlotKeywords(BaseModel):
-    """Pydantic model for extracting relevant keywords for plotting from specifications"""
-    keywords: List[str] = Field(default_factory=list, description="List of relevant keywords for plotting")
-    confidence_score: float = Field(0.0, description="Confidence score of the extracted keywords (0.0 to 1.0)")
 
 
 class ReporterAgent:
@@ -75,17 +68,7 @@ class ReporterAgent:
                 # Fallback to basic keywords if no specs available
                 return ['confidence', 'score', 'result', 'detection']
 
-            # Build RAG query to extract relevant plotting keywords
-            rag_query = f"""
-            このアルゴリズム仕様書から、プロットに適した重要な指標や列名を抽出してください。
-            特に以下の点を考慮して抽出してください：
-            1. 数値データとしてプロット可能な指標
-            2. 信頼度や確率を示す指標
-            3. 検知結果を示す指標
-            4. 分析の主要な出力指標
-
-            仕様書の内容に基づいて、プロットに適したキーワードをリスト形式で返してください。
-            """
+            # (unused detailed prompt removed)
 
             # Get relevant information from specs
             relevant_info = ""
@@ -547,9 +530,7 @@ class ReporterAgent:
             # Prepare algorithm-specific context
             algorithm_context = self._prepare_algorithm_context(algorithm_config)
 
-            # Debug: Log specification content summaries
-            logger.info(f"Algorithm spec preview: {algorithm_spec[:200] if algorithm_spec else 'None'}")
-            logger.info(f"Evaluation spec preview: {evaluation_spec[:200] if evaluation_spec else 'None'}")
+            # (spec previews removed to reduce noise)
 
             # Generate visualization plots
             plot_files = self._generate_visualization_plots(dataset, algorithm_config)
@@ -573,8 +554,6 @@ class ReporterAgent:
                 "evaluation_interval": prompt_context["evaluation_interval"],
                 "algorithm_plot_link": prompt_context["algorithm_plot_link"],
                 "core_plot_link": prompt_context["core_plot_link"],
-                "algorithm_plot_base64": prompt_context["algorithm_plot_base64"],
-                "core_plot_base64": prompt_context["core_plot_base64"],
                 **algorithm_context,
                 "dataset_id": dataset.id,
                 "dataset_info": prompt_context["dataset_info"],
@@ -610,7 +589,7 @@ class ReporterAgent:
         plot_files = {"algorithm": "", "core": ""}
         try:
             logger.info(f"Generating visualization plots for dataset {dataset.id}")
-            logger.info("\n\n\n======\n\n\n")
+            #
 
             # Create plots directory in the same location as reports
             structure = ensure_analysis_output_structure(config.output_dir)
@@ -1350,18 +1329,12 @@ plt.tight_layout()
         dataset_dirs = get_report_paths(config.output_dir, f"report_{dataset.id}")
         algorithm_plot_link = ""
         core_plot_link = ""
-        algorithm_plot_b64 = ""
-        core_plot_b64 = ""
 
         if plot_files.get("algorithm"):
             algorithm_plot_link = f"viz/{plot_files['algorithm']}"
-            algorithm_plot_path = dataset_dirs["images"] / plot_files["algorithm"]
-            algorithm_plot_b64 = encode_file_to_base64(algorithm_plot_path)
 
         if plot_files.get("core"):
             core_plot_link = f"viz/{plot_files['core']}"
-            core_plot_path = dataset_dirs["images"] / plot_files["core"]
-            core_plot_b64 = encode_file_to_base64(core_plot_path)
 
         return {
             "dataset_id": dataset.id,
@@ -1370,8 +1343,6 @@ plt.tight_layout()
             "hypotheses_summary": hypotheses_summary,
             "algorithm_plot_link": algorithm_plot_link,
             "core_plot_link": core_plot_link,
-            "algorithm_plot_base64": algorithm_plot_b64,
-            "core_plot_base64": core_plot_b64,
             "representative_stats": stats_text,
             "evaluation_interval": interval_line,
             **algorithm_context,

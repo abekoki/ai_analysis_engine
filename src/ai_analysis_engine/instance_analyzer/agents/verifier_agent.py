@@ -98,23 +98,6 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
             # Load algorithm configuration dynamically
             algorithm_config = self._load_algorithm_config(dataset)
 
-            # Load specifications
-            algorithm_spec = ""
-            if dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        algorithm_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load algorithm spec: {e}")
-
-            evaluation_spec = ""
-            if dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        evaluation_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load evaluation spec: {e}")
-
             # Prepare verification context
             dataset_info = self._prepare_dataset_info(dataset)
 
@@ -123,8 +106,7 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
 
             # Use LLM to generate verification plan with algorithm context
             verification_plan = self._generate_verification_plan(
-                hypothesis, dataset, algorithm_spec, evaluation_spec,
-                dataset_info, algorithm_context
+                hypothesis, dataset, dataset_info, algorithm_context
             )
 
             # Generate dynamic verification code/tests based on plan
@@ -212,7 +194,6 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
         }
 
     def _generate_verification_plan(self, hypothesis: Hypothesis, dataset: DatasetInfo,
-                                   algorithm_spec: str, evaluation_spec: str,
                                    dataset_info: str, algorithm_context: Dict[str, Any]) -> str:
         """
         Generate verification plan using LLM with algorithm context
@@ -220,8 +201,6 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
         Args:
             hypothesis: Hypothesis to verify
             dataset: Dataset information
-            algorithm_spec: Algorithm specification content
-            evaluation_spec: Evaluation specification content
             dataset_info: Dataset information string
             algorithm_context: Algorithm context dictionary
 

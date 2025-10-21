@@ -106,7 +106,6 @@ class SupervisorNode:
         logger.info("Supervisor processing")
 
         current_dataset = state.get_current_dataset()
-        max_instances = getattr(state, "max_instances", None)
 
         if current_dataset is None:
             # All datasets processed
@@ -156,7 +155,6 @@ class DataCheckerNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Check and analyze data for current dataset"""
         logger.info("Data checker processing")
-        logger.info("\n\n\n======\n\n\n")
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -1060,8 +1058,6 @@ class VerifierNode:
 
             for hypothesis in current_dataset.hypotheses or []:
                 if hasattr(hypothesis, 'model_dump'):  # Pydantic model
-                    # Convert Hypothesis object to dict for compatibility
-                    hypothesis_dict = hypothesis.model_dump()
                     result = self.verifier_agent.verify_hypothesis(current_dataset, hypothesis)
                 else:
                     # Legacy dict format

@@ -349,24 +349,24 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
             if data is None:
                 return hypotheses
 
-                for hypo_data in data.get("hypotheses", []):
-                    try:
-                        hypothesis = Hypothesis(
-                            id=hypo_data["id"],
-                            type=HypothesisType(hypo_data["type"]),
-                            category=hypo_data.get("category", "unknown"),
-                            description=hypo_data["description"],
-                            confidence_score=float(hypo_data["confidence_score"]),
-                            evidence=hypo_data.get("evidence", []),
-                            spec_reference=hypo_data.get("spec_reference"),
-                            analysis_step=hypo_data.get("analysis_step"),
-                            suggested_fix=hypo_data.get("suggested_fix"),
-                            expected_impact=hypo_data.get("expected_impact")
-                        )
-                        hypotheses.append(hypothesis)
-                    except (KeyError, ValueError) as e:
-                        logger.warning(f"Invalid hypothesis data: {e}")
-                        continue
+            for hypo_data in data.get("hypotheses", []):
+                try:
+                    hypothesis = Hypothesis(
+                        id=hypo_data["id"],
+                        type=HypothesisType(hypo_data["type"]),
+                        category=hypo_data.get("category", "unknown"),
+                        description=hypo_data["description"],
+                        confidence_score=float(hypo_data["confidence_score"]),
+                        evidence=hypo_data.get("evidence", []),
+                        spec_reference=hypo_data.get("spec_reference"),
+                        analysis_step=hypo_data.get("analysis_step"),
+                        suggested_fix=hypo_data.get("suggested_fix"),
+                        expected_impact=hypo_data.get("expected_impact")
+                    )
+                    hypotheses.append(hypothesis)
+                except (KeyError, ValueError) as e:
+                    logger.warning(f"Invalid hypothesis data: {e}")
+                    continue
 
         except Exception as e:
             logger.warning(f"Failed to parse hypotheses: {e}")
