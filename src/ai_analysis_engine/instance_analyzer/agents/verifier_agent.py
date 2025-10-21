@@ -5,6 +5,7 @@ Verifier Agent - Verifies hypotheses through testing
 from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
 
 from ..config import config
 from ..models.state import DatasetInfo
@@ -97,6 +98,9 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
 
             # Load algorithm configuration dynamically
             algorithm_config = self._load_algorithm_config(dataset)
+            from ..config.config import AlgorithmConfig
+            if algorithm_config is None:
+                algorithm_config = AlgorithmConfig()
 
             # Prepare verification context
             dataset_info = self._prepare_dataset_info(dataset)
@@ -104,7 +108,7 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
             # Prepare algorithm-specific context
             algorithm_context = self._prepare_algorithm_context(algorithm_config)
 
-            # Use LLM to generate verification plan with algorithm context
+            # Use LLM to generate verification plan with algorithm context (allow simple tools)
             verification_plan = self._generate_verification_plan(
                 hypothesis, dataset, dataset_info, algorithm_context
             )
@@ -232,7 +236,10 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
 """
 
         try:
-            response = self.llm.invoke(plan_prompt)
+            # Give the LLM access to a minimal spec_context tool for planning
+            tools = [self._create_spec_context_tool(dataset)]
+            chain = self.llm.bind_tools(tools)
+            response = chain.invoke(plan_prompt)
             self._log_prompt(
                 node="verifier_plan",
                 dataset_id=getattr(dataset, "id", None),
@@ -251,6 +258,22 @@ Pythonコードを使って仕様に基づいた動的検証を行い、結果�
         except Exception as e:
             logger.warning(f"Failed to generate verification plan: {e}")
             return f"Basic verification of hypothesis: {hypothesis.description}"
+
+    def _create_spec_context_tool(self, dataset: DatasetInfo):
+        @tool
+        def spec_context(max_chars: int = 1500) -> str:
+            """Return algorithm/evaluation spec text for verification planning, truncated by max_chars."""
+            try:
+                algo = getattr(dataset, 'algorithm_spec_text', None) or ''
+                eva = getattr(dataset, 'evaluation_spec_text', None) or ''
+                text = (algo + "\n\n" + eva).strip()
+                if not text:
+                    hits = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=2)
+                    text = "\n\n".join([r.get('content','') for r in (hits or [])])
+                return text[:max_chars]
+            except Exception as e:
+                return f"spec_context failed: {e}"
+        return spec_context
 
     def _generate_dynamic_verification_code(self, hypothesis: Hypothesis, dataset: DatasetInfo,
                                            algorithm_config, verification_plan: str) -> str:

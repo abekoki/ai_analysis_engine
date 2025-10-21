@@ -19,6 +19,10 @@ class DatasetInfo(BaseModel):
     expected_result: str = Field(..., description="Natural language description of expected results")
     evaluation_interval: Optional[Dict[str, Any]] = Field(default=None, description="Evaluation interval information (start, end, etc.)")
 
+    # Cached specification texts fetched via RAG (no direct file reads)
+    algorithm_spec_text: Optional[str] = Field(default=None, description="Algorithm specification text content (via RAG)")
+    evaluation_spec_text: Optional[str] = Field(default=None, description="Evaluation specification text content (via RAG)")
+
     # Processing state
     data_summary: Optional[Dict[str, Any]] = Field(default=None, description="Data summary from DataChecker")
     consistency_check: Optional[Dict[str, Any]] = Field(default=None, description="Consistency check results")
@@ -60,6 +64,9 @@ class AnalysisState(BaseModel):
 
     # Error handling
     errors: List[str] = Field(default_factory=list, description="List of error messages")
+
+    # Agent reasoning/messages log (high-level steps and outcomes)
+    messages: List[str] = Field(default_factory=list, description="High-level agent messages and reasoning breadcrumbs")
 
     # Metadata
     start_time: Optional[str] = Field(default=None, description="Workflow start timestamp")

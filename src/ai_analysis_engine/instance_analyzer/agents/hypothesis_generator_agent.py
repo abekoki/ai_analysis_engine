@@ -5,6 +5,7 @@ Hypothesis Generator Agent - Generates hypotheses about potential issues
 from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from .agent_tools import rag_search_tool
 
 from ..config import config
 from ..models.state import DatasetInfo
@@ -139,23 +140,26 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
 
             # Load algorithm configuration dynamically
             algorithm_config = self._load_algorithm_config(dataset)
+            from ..config.config import AlgorithmConfig
+            if algorithm_config is None:
+                algorithm_config = AlgorithmConfig()
 
-            # Load specifications
-            algorithm_spec = ""
-            if dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        algorithm_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load algorithm spec: {e}")
-
-            evaluation_spec = ""
-            if dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        evaluation_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load evaluation spec: {e}")
+            # Fetch specifications via RAG (no direct file I/O)
+            algorithm_spec = getattr(dataset, 'algorithm_spec_text', None) or ""
+            evaluation_spec = getattr(dataset, 'evaluation_spec_text', None) or ""
+            try:
+                from ..tools.rag_tool import RAGTool
+                rag = RAGTool()
+                if not algorithm_spec:
+                    algo_hits = rag.search("algorithm specification core sections", "algorithm_specs", k=3)
+                    algorithm_spec = "\n\n".join([r.get('content', '') for r in algo_hits])[:3000]
+                    dataset.algorithm_spec_text = algorithm_spec
+                if not evaluation_spec:
+                    eval_hits = rag.search("evaluation specification core sections", "evaluation_specs", k=3)
+                    evaluation_spec = "\n\n".join([r.get('content', '') for r in eval_hits])[:3000]
+                    dataset.evaluation_spec_text = evaluation_spec
+            except Exception as e:
+                logger.warning(f"RAG spec retrieval failed: {e}")
 
             # Prepare input data
             dataset_info = self._prepare_dataset_info(dataset)
@@ -165,8 +169,11 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
             # Prepare algorithm-specific context
             algorithm_context = self._prepare_algorithm_context(algorithm_config)
 
-            # Use LLM to generate hypotheses with algorithm context
-            chain = self.prompt | self.llm
+            # Prepare lightweight tools for context lookup
+            tools = [rag_search_tool(self.rag_tool)]
+
+            # Use LLM to generate hypotheses with algorithm context (ReAct-ready)
+            chain = self.prompt | self.llm.bind_tools(tools)
 
             response = chain.invoke({
                 "dataset_info": dataset_info,
@@ -302,8 +309,8 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
 
         summary_lines = []
 
-        # Basic analysis summary
-        basic = data_analysis.get("basic_analysis", {})
+        # Basic analysis summary (standardized)
+        basic = data_analysis.get("basic_analysis") or {}
         for name, analysis in basic.items():
             if isinstance(analysis, dict) and "shape" in analysis:
                 shape = analysis["shape"]
@@ -381,8 +388,9 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
         hypotheses = []
 
         # Rule 1: High missing values (Data-related)
-        if data_analysis.get("basic_analysis"):
-            for name, analysis in data_analysis["basic_analysis"].items():
+        basic = data_analysis.get("basic_analysis") or {}
+        if basic:
+            for name, analysis in basic.items():
                 if isinstance(analysis, dict) and "missing_values" in analysis:
                     missing = analysis["missing_values"]
                     total_missing = sum(missing.values())
@@ -408,18 +416,18 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
                     id="consistency_issue",
                     type=HypothesisType.SPECIFICATION_INCONSISTENCY,
                     category="algorithm",
-                    description=f"仕様不整合: {issues[0]}",
+                    description=f"仕様と実装/データの不整合が検出: {issues[0]}",
                     confidence_score=0.8,
                     evidence=issues[:3],
                     analysis_step="5",
-                    spec_reference="アルゴリズム仕様書",
-                    suggested_fix="仕様書の確認と実装の修正",
+                    spec_reference="仕様／要件定義",
+                    suggested_fix="仕様の明確化と実装の整合化",
                     expected_impact="仕様準拠性の向上"
                 ))
 
         # Rule 3: Empty dataframes (Data-related)
-        if data_analysis.get("basic_analysis"):
-            for name, analysis in data_analysis["basic_analysis"].items():
+        if basic:
+            for name, analysis in basic.items():
                 if isinstance(analysis, dict) and analysis.get("shape", [0, 0])[0] == 0:
                     hypotheses.append(Hypothesis(
                         id=f"empty_data_{name}",
@@ -437,8 +445,8 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
         # Rule 4: Algorithm-specific validation (Algorithm-related)
         if algorithm_config:
             # Check threshold compliance
-            if data_analysis.get("basic_analysis"):
-                for name, analysis in data_analysis["basic_analysis"].items():
+            if basic:
+                for name, analysis in basic.items():
                     if isinstance(analysis, dict) and "algorithm_validation" in analysis:
                         validation = analysis["algorithm_validation"]
                         if validation.get("threshold_compliance"):
@@ -457,11 +465,11 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
                                         expected_impact="検知精度の改善"
                                     ))
 
-        # Rule 5: Quality condition issues (Context-related)
+        # Rule 5: Quality/validity condition issues (Context-related)
         if algorithm_config:
             # Check quality/confidence conditions
             quality_thresholds = [k for k in algorithm_config.thresholds.keys()
-                                if 'confidence' in k.lower() or 'quality' in k.lower()]
+                                if 'confidence' in k.lower() or 'quality' in k.lower() or 'valid' in k.lower()]
             if quality_thresholds and data_analysis.get("basic_analysis"):
                 for name, analysis in data_analysis["basic_analysis"].items():
                     if isinstance(analysis, dict) and "algorithm_validation" in analysis:
@@ -475,18 +483,18 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
                                         id=f"quality_condition_{threshold_name}",
                                         type=HypothesisType.DATA_QUALITY_ISSUE,
                                         category="context",
-                                        description=f"信頼度条件未充足: {threshold_name}が{compliance['below_threshold']}フレームで条件を満たしていない",
+                                        description=f"品質/妥当性条件未充足: {threshold_name} が {compliance['below_threshold']} サンプルで閾値を下回る",
                                         confidence_score=0.8,
-                                        evidence=[f"信頼度条件未充足フレーム数: {compliance['below_threshold']}"],
+                                        evidence=[f"閾値未満サンプル数: {compliance['below_threshold']}"] ,
                                         analysis_step="5",
-                                        spec_reference=f"{threshold_name}品質要件",
-                                        suggested_fix="信頼度条件の見直しまたはデータ収集条件の改善",
-                                        expected_impact="検知結果の信頼性向上"
+                                        spec_reference=f"{threshold_name} 条件",
+                                        suggested_fix="条件設定またはデータ収集条件の見直し",
+                                        expected_impact="結果の信頼性向上"
                                     ))
 
             # Check value range compliance
-            if data_analysis.get("basic_analysis"):
-                for name, analysis in data_analysis["basic_analysis"].items():
+            if basic:
+                for name, analysis in basic.items():
                     if isinstance(analysis, dict) and "algorithm_validation" in analysis:
                         validation = analysis["algorithm_validation"]
                         if validation.get("value_range_compliance"):
@@ -496,12 +504,12 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
                                         id=f"range_issue_{col}",
                                         type=HypothesisType.DATA_QUALITY_ISSUE,
                                         category="data",
-                                        description=f"値範囲問題: {col}の{compliance['percentage']:.1f}%が有効範囲外",
+                                        description=f"値範囲問題: {col} の {compliance['percentage']:.1f}% が有効範囲外",
                                         confidence_score=0.7,
                                         evidence=[f"範囲外データ率: {compliance['percentage']:.1f}%"],
                                         analysis_step="5",
-                                        spec_reference=f"{col}有効範囲",
-                                        suggested_fix=f"{col}のデータ範囲を修正",
+                                        spec_reference=f"{col} 値域",
+                                        suggested_fix=f"{col} のデータ範囲の調整/正規化",
                                         expected_impact="データ品質の向上"
                                     ))
 
@@ -521,3 +529,5 @@ class HypothesisGeneratorAgent(PromptLoggingMixin):
                 unique.append(hypo)
 
         return unique
+
+    # common rag_search tool is used from agent_tools

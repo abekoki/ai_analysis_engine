@@ -5,6 +5,7 @@ Consistency Checker Agent - Checks consistency between data and specifications
 from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from .agent_tools import rag_search_tool, analyze_data_tool, check_frame_range_tool
 
 from ..config import config
 from ..models.state import DatasetInfo
@@ -87,23 +88,22 @@ class ConsistencyCheckerAgent(PromptLoggingMixin):
         try:
             logger.info(f"Starting consistency check for dataset {dataset.id}")
 
-            # Load algorithm spec
-            algorithm_spec = ""
-            if dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        algorithm_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load algorithm spec: {e}")
-
-            # Load evaluation spec
-            evaluation_spec = ""
-            if dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        evaluation_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load evaluation spec: {e}")
+            # Fetch specs via RAG (no direct file I/O)
+            algorithm_spec = getattr(dataset, 'algorithm_spec_text', None) or ""
+            evaluation_spec = getattr(dataset, 'evaluation_spec_text', None) or ""
+            try:
+                from ..tools.rag_tool import RAGTool
+                rag = RAGTool()
+                if not algorithm_spec:
+                    algo_hits = rag.search("algorithm specification core sections", "algorithm_specs", k=3)
+                    algorithm_spec = "\n\n".join([r.get('content', '') for r in algo_hits])[:3000]
+                    dataset.algorithm_spec_text = algorithm_spec
+                if not evaluation_spec:
+                    eval_hits = rag.search("evaluation specification core sections", "evaluation_specs", k=3)
+                    evaluation_spec = "\n\n".join([r.get('content', '') for r in eval_hits])[:3000]
+                    dataset.evaluation_spec_text = evaluation_spec
+            except Exception as e:
+                logger.warning(f"RAG spec retrieval failed: {e}")
 
             # Prepare dataset info
             dataset_info = self._prepare_dataset_info(dataset)
@@ -116,8 +116,15 @@ class ConsistencyCheckerAgent(PromptLoggingMixin):
                 dataset, data_analysis, parsed_expectation
             )
 
-            # Use LLM for final assessment
-            chain = self.prompt | self.llm
+            # Prepare tools (dataset-bound)
+            tools = [
+                rag_search_tool(self.rag_tool),
+                analyze_data_tool(self.repl_tool, dataset),
+                check_frame_range_tool(self.repl_tool, dataset),
+            ]
+
+            # Use LLM (ReAct-ready) for final assessment
+            chain = self.prompt | self.llm.bind_tools(tools)
 
             response = chain.invoke({
                 "dataset_info": dataset_info,
@@ -143,6 +150,14 @@ class ConsistencyCheckerAgent(PromptLoggingMixin):
                 dataset_id=getattr(dataset, "id", None),
                 response=response,
             )
+
+            # Execute any tool calls requested by the model (single-turn execution)
+            try:
+                tool_results = self._execute_tools(getattr(response, 'tool_calls', None), dataset)
+                if tool_results:
+                    consistency_results["tool_results"] = tool_results
+            except Exception as _tool_ex:
+                logger.warning(f"Tool execution failed: {_tool_ex}")
 
             consistency_results["llm_assessment"] = response.content
 
@@ -335,3 +350,22 @@ class ConsistencyCheckerAgent(PromptLoggingMixin):
             "consistent": True,
             "message": "Data completeness is acceptable"
         }
+
+    def _execute_tools(self, tool_calls, dataset: DatasetInfo = None) -> Dict[str, Any]:
+        """Execute tool calls and collect results (single turn)."""
+        results: Dict[str, Any] = {}
+        if not tool_calls:
+            return results
+        for call in tool_calls:
+            try:
+                name = call.get('name') if isinstance(call, dict) else getattr(call, 'name', None)
+                args = call.get('args') if isinstance(call, dict) else getattr(call, 'args', {})
+                if name == 'rag_search':
+                    results['rag_search'] = rag_search_tool(self.rag_tool)(args.get('query', ''), args.get('segment', 'algorithm_specs'), args.get('k', 3))
+                elif name == 'analyze_data':
+                    results['analyze_data'] = analyze_data_tool(self.repl_tool, dataset)(args.get('target', 'algorithm'), args.get('analysis_type', 'summary'))
+                elif name == 'check_frame_range':
+                    results['check_frame_range'] = check_frame_range_tool(self.repl_tool, dataset)(args.get('start', 0), args.get('end', 0), args.get('target', 'algorithm'))
+            except Exception as e:
+                logger.error(f"Tool execution failed: {e}")
+        return results

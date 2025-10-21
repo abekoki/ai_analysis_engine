@@ -227,10 +227,14 @@ class Config:
                                     if values and col not in config.valid_values:
                                         config.valid_values[col] = sorted(list(set(values)))
 
-            # Extract detection patterns using LLM
-            from ..utils.exploration_utils import exploration_tool
-            detection_patterns = exploration_tool.extract_patterns_from_spec(spec_content)
-            config.detection_patterns.update(detection_patterns)
+            # Extract detection patterns using LLM (optional)
+            try:
+                from ..utils.exploration_utils import exploration_tool
+                detection_patterns = exploration_tool.extract_patterns_from_spec(spec_content)
+                config.detection_patterns.update(detection_patterns)
+            except Exception:
+                # Keep domain-agnostic; skip if helper is unavailable
+                pass
 
             # Add threshold-based patterns
             for threshold_name, threshold_value in config.thresholds.items():
@@ -257,6 +261,9 @@ class Config:
         except Exception as e:
             # LLM extraction failed - raise error instead of fallback
             raise RuntimeError(f"Algorithm configuration extraction failed: {e}") from e
+
+        # Always return the parsed configuration
+        return config
 
     def load_algorithm_config_from_file(self, spec_file_path: str) -> AlgorithmConfig:
         """

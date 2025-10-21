@@ -5,6 +5,8 @@ Reporter Agent - Generates final analysis reports
 from typing import Dict, Any, List, Optional, Tuple
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from .agent_tools import rag_search_tool
 from pathlib import Path
 from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
@@ -449,7 +451,12 @@ class ReporterAgent:
 仮説と検証結果:
 {hypotheses_results}
 
-【レポート作成ガイドライン】
+【レポート作成ガイドライン（厳格）】
+- 出力は必ず以下のMarkdown構造・見出し・順序に従うこと。
+- 各セクションは最低2文以上、合計600文字以上とする。
+- 具体的な数値（例: 行数、割合、代表値）を最低3箇所以上引用する。
+- 箇条書きは各項目で最低2点以上列挙する。
+- ドメイン固有語は使用せず、仕様/データ/条件/閾値/値域/出力などの汎用語で表現する。
 
 # 個別データ分析レポート - {dataset_id}
 
@@ -471,15 +478,18 @@ class ReporterAgent:
 コア出力結果
 <!-- コア出力データの時系列グラフ（閾値付き）-->
 
-<!-- 上記のグラフを生成後、閉眼傾向があるかを仮説検証にて確認し、結果を以下に記載 -->
-- 入出力の確認結果: [具体的な数値分析結果]
+### 分析サマリ
+- 入出力の確認結果: [具体的な数値分析結果（例: 行数、割合、平均/中央値/最小/最大 等）]
+- 値域・閾値の適合状況: [しきい値と分布の差異、逸脱割合]
 
-- 考えられる原因: [分析結果に基づき、1つ以上の原因を箇点で整理]
+### 考えられる原因
+- [分析結果に基づく原因1]
+- [分析結果に基づく原因2]
 
 
 ## 推奨事項
 
-- [具体的な改善提案と次のステップ]
+- [具体的な改善提案と次のステップ（設定/前処理/検証手順など汎用観点）]
 
 ## 参照した仕様/コード（抜粋）
 ... <!-- 仮説検証にて参照した仕様/コードをすべて記載-->
@@ -507,25 +517,26 @@ class ReporterAgent:
 
             # Load algorithm configuration dynamically
             algorithm_config = self._load_algorithm_config(dataset)
+            from ..config.config import AlgorithmConfig
+            if algorithm_config is None:
+                algorithm_config = AlgorithmConfig()
 
-            # Load specifications
-            algorithm_spec = ""
-            if dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        algorithm_spec = f.read()
-                        logger.info(f"Loaded algorithm spec: {len(algorithm_spec)} characters")
-                except Exception as e:
-                    logger.warning(f"Failed to load algorithm spec: {e}")
-
-            evaluation_spec = ""
-            if dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        evaluation_spec = f.read()
-                        logger.info(f"Loaded evaluation spec: {len(evaluation_spec)} characters")
-                except Exception as e:
-                    logger.warning(f"Failed to load evaluation spec: {e}")
+            # Fetch specifications via RAG (no direct file I/O)
+            algorithm_spec = getattr(dataset, 'algorithm_spec_text', None) or ""
+            evaluation_spec = getattr(dataset, 'evaluation_spec_text', None) or ""
+            try:
+                from ..tools.rag_tool import RAGTool
+                rag = RAGTool()
+                if not algorithm_spec:
+                    hits = rag.search("algorithm specification core sections", "algorithm_specs", k=3)
+                    algorithm_spec = "\n\n".join([r.get('content', '') for r in hits])[:3000]
+                    dataset.algorithm_spec_text = algorithm_spec
+                if not evaluation_spec:
+                    hits = rag.search("evaluation specification core sections", "evaluation_specs", k=3)
+                    evaluation_spec = "\n\n".join([r.get('content', '') for r in hits])[:3000]
+                    dataset.evaluation_spec_text = evaluation_spec
+            except Exception as e:
+                logger.warning(f"RAG spec retrieval failed: {e}")
 
             # Prepare algorithm-specific context
             algorithm_context = self._prepare_algorithm_context(algorithm_config)
@@ -543,9 +554,10 @@ class ReporterAgent:
                 plot_files,
             )
 
+            # Single-shot generation without tool-calls to ensure final content
             chain = self.report_prompt | self.llm
 
-            response = chain.invoke({
+            inputs = {
                 "algorithm_spec": algorithm_spec[:3000],
                 "evaluation_spec": evaluation_spec[:2000],
                 "analysis_results": prompt_context["analysis_summary"],
@@ -557,7 +569,10 @@ class ReporterAgent:
                 **algorithm_context,
                 "dataset_id": dataset.id,
                 "dataset_info": prompt_context["dataset_info"],
-            })
+            }
+
+            response = chain.invoke(inputs)
+            # Strict: no fallback/tool-followup. Assume single-shot prompt produces final output.
 
             report_content = response.content.strip()
             report_content = self._insert_plots_into_report(report_content, plot_files, dataset.id)
@@ -565,7 +580,7 @@ class ReporterAgent:
             # Add algorithm configuration info to report
             if algorithm_config:
                 report_content += f"\n\n## アルゴリズム設定情報\n"
-                report_content += f"- アルゴリズム名: {algorithm_config.name}\n"
+                report_content += f"- アルゴリズム名: {algorithm_config.name or 'Unknown Algorithm'}\n"
                 report_content += f"- 閾値設定: {algorithm_config.thresholds}\n"
                 report_content += f"- 必須列: {algorithm_config.required_columns}\n"
 
@@ -661,17 +676,13 @@ class ReporterAgent:
                 if col in df_columns:
                     return col
 
-            # If no obvious candidates, use LLM to infer
-            if not spec_content and algorithm_config:
-                # Try to get spec content from algorithm config
+            # If no obvious candidates, try to gather minimal spec context via RAG (no direct file I/O)
+            if not spec_content:
                 try:
-                    import os
-                    if hasattr(algorithm_config, 'spec_file') and algorithm_config.spec_file:
-                        if os.path.exists(algorithm_config.spec_file):
-                            with open(algorithm_config.spec_file, 'r', encoding='utf-8') as f:
-                                spec_content = f.read()[:1000]  # Limit content
-                except:
-                    pass
+                    hits = self.rag_tool.search("time/frame axis column", "algorithm_specs", k=2)
+                    spec_content = "\n\n".join([r.get('content', '') for r in hits])[:1000]
+                except Exception:
+                    spec_content = ""
 
             if spec_content:
                 x_axis_prompt = f"""以下のアルゴリズム仕様と利用可能な列名から、時系列プロットのx軸に最も適した列名を1つ選んでください。
@@ -1074,9 +1085,23 @@ df = df.reset_index(drop=True)
         Returns:
             AlgorithmConfig: Loaded configuration
         """
+        # Prefer spec text (via RAG/cache), fallback to file
+        try:
+            spec_text = getattr(dataset, 'algorithm_spec_text', None)
+            if spec_text:
+                cfg = config.load_algorithm_config_from_spec(spec_text)
+                if cfg and getattr(cfg, 'name', ''):
+                    logger.info(f"Algorithm config loaded from spec text: name='{cfg.name}'")
+                    return cfg
+        except Exception as e:
+            logger.warning(f"Failed to load algorithm config from spec text: {e}")
+
         if dataset.algorithm_spec_md:
             try:
-                return config.load_algorithm_config_from_file(dataset.algorithm_spec_md)
+                cfg = config.load_algorithm_config_from_file(dataset.algorithm_spec_md)
+                if cfg:
+                    logger.info(f"Algorithm config loaded from file: name='{getattr(cfg, 'name', '')}'")
+                return cfg
             except Exception as e:
                 logger.warning(f"Failed to load algorithm config from file: {e}")
 
@@ -1350,26 +1375,46 @@ plt.tight_layout()
 
     def _collect_spec_context(self, dataset: DatasetInfo, algorithm_config: 'AlgorithmConfig') -> str:
         spec_content = ""
-        if dataset:
-            if hasattr(dataset, 'algorithm_spec_md') and dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        spec_content += f.read()[:2000]
-                except Exception as ex:
-                    logger.warning(f"Failed to load algorithm spec: {ex}")
-            if hasattr(dataset, 'evaluation_spec_md') and dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        spec_content += "\n" + f.read()[:2000]
-                except Exception as ex:
-                    logger.warning(f"Failed to load evaluation spec: {ex}")
+        try:
+            # Prefer cached texts populated by agents
+            if dataset:
+                algo_text = getattr(dataset, 'algorithm_spec_text', None)
+                eval_text = getattr(dataset, 'evaluation_spec_text', None)
+                if algo_text:
+                    spec_content += algo_text[:2000]
+                if eval_text:
+                    if spec_content:
+                        spec_content += "\n"
+                    spec_content += eval_text[:2000]
 
-        if not spec_content and algorithm_config and hasattr(algorithm_config, 'spec_file') and algorithm_config.spec_file:
-            import os
-            if os.path.exists(algorithm_config.spec_file):
-                with open(algorithm_config.spec_file, 'r', encoding='utf-8') as f:
-                    spec_content += f.read()[:2000]
+            # Fall back to RAG lookups if still empty
+            if not spec_content:
+                algo_hits = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=2)
+                eval_hits = self.rag_tool.search("evaluation specification core sections", "evaluation_specs", k=2)
+                parts = [r.get('content', '') for r in (algo_hits or [])] + [r.get('content', '') for r in (eval_hits or [])]
+                spec_content = "\n\n".join([p for p in parts if p])[:2000]
+        except Exception as ex:
+            logger.warning(f"Failed to collect spec context via RAG: {ex}")
         return spec_content
+
+    def _create_spec_context_tool(self, dataset: DatasetInfo):
+        """Provide spec context to the LLM upon request (from cached or RAG)."""
+        @tool
+        def spec_context(max_chars: int = 2000) -> str:
+            """Return concatenated algorithm/evaluation spec text (cached or via RAG), truncated by max_chars."""
+            try:
+                text = (getattr(dataset, 'algorithm_spec_text', None) or '')
+                et = (getattr(dataset, 'evaluation_spec_text', None) or '')
+                combined = (text + "\n\n" + et).strip()
+                if not combined:
+                    # fallback via RAG
+                    algo = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=2)
+                    eva = self.rag_tool.search("evaluation specification core sections", "evaluation_specs", k=2)
+                    combined = "\n\n".join([r.get('content','') for r in (algo or [])] + [r.get('content','') for r in (eva or [])])
+                return combined[:max_chars]
+            except Exception as e:
+                return f"spec_context failed: {e}"
+        return spec_context
 
     def _infer_plot_columns_with_llm(
         self,

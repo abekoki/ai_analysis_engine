@@ -6,6 +6,7 @@ from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
+from .agent_tools import rag_search_tool, analyze_data_tool, create_plot_tool
 
 from ..config import config
 from ..models.state import AnalysisState, DatasetInfo
@@ -33,12 +34,8 @@ class DataCheckerAgent(PromptLoggingMixin):
         self.rag_tool = RAGTool()
         self.repl_tool = REPLTool()
 
-        # Setup tools
-        self.tools = [
-            self._create_rag_search_tool(),
-            self._create_data_analysis_tool(),
-            self._create_plot_creation_tool()
-        ]
+        # Tools will be created per-dataset to ensure correct bindings
+        self.tools = []
 
         self.prompt = ChatPromptTemplate.from_template("""
 あなたは汎用データ確認エージェントです。解析手順詳細.mdの「1. 分析の準備」に基づいて、アルゴリズム仕様を理解し、データセットを分析します。
@@ -106,22 +103,20 @@ class DataCheckerAgent(PromptLoggingMixin):
             # Load algorithm configuration dynamically
             algorithm_config = self._load_algorithm_config(dataset)
 
-            # Load specifications
-            algorithm_spec = ""
-            if dataset.algorithm_spec_md:
-                try:
-                    with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                        algorithm_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load algorithm spec: {e}")
-
-            evaluation_spec = ""
-            if dataset.evaluation_spec_md:
-                try:
-                    with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                        evaluation_spec = f.read()
-                except Exception as e:
-                    logger.warning(f"Failed to load evaluation spec: {e}")
+            # Fetch specifications via RAG (no direct file I/O)
+            algorithm_spec = dataset.algorithm_spec_text or ""
+            evaluation_spec = dataset.evaluation_spec_text or ""
+            try:
+                if not algorithm_spec:
+                    rag_algo = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=3)
+                    algorithm_spec = "\n\n".join([r.get("content", "") for r in rag_algo])[:3000]
+                    dataset.algorithm_spec_text = algorithm_spec
+                if not evaluation_spec:
+                    rag_eval = self.rag_tool.search("evaluation specification core sections", "evaluation_specs", k=3)
+                    evaluation_spec = "\n\n".join([r.get("content", "") for r in rag_eval])[:3000]
+                    dataset.evaluation_spec_text = evaluation_spec
+            except Exception as e:
+                logger.warning(f"RAG spec retrieval failed: {e}")
 
             # Prepare dataset info
             dataset_info = self._prepare_dataset_info(dataset)
@@ -129,8 +124,15 @@ class DataCheckerAgent(PromptLoggingMixin):
             # Prepare algorithm-specific context
             algorithm_context = self._prepare_algorithm_context(algorithm_config)
 
+            # Build dataset-bound tools
+            tools = [
+                rag_search_tool(self.rag_tool),
+                analyze_data_tool(self.repl_tool, dataset),
+                create_plot_tool(self.repl_tool, dataset),
+            ]
+
             # Use LLM with tools for analysis
-            chain = self.prompt | self.llm.bind_tools(self.tools)
+            chain = self.prompt | self.llm.bind_tools(tools)
 
             response = chain.invoke({
                 "dataset_info": dataset_info,

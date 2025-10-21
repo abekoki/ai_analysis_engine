@@ -3,6 +3,7 @@ LangGraph nodes for the AI Analysis Engine workflow
 """
 
 from typing import Dict, Any, Iterable, List, Optional
+import pandas as pd
 from datetime import datetime
 
 from ..models.state import AnalysisState, DatasetInfo
@@ -43,6 +44,10 @@ class InitializationNode:
                 state.vector_stores.is_initialized = True
                 state.vector_stores.segments = {segment: f"vectorstore_{segment}" for segment in documents.keys()}
                 state.vector_stores.last_updated = datetime.now().isoformat()
+                try:
+                    state.messages.append("Initialization: vector stores ready")
+                except Exception:
+                    pass
 
                 logger.info("Initialization completed successfully")
             else:
@@ -104,6 +109,10 @@ class SupervisorNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Supervise and route to appropriate next step"""
         logger.info("Supervisor processing")
+        try:
+            state.messages.append("Supervisor: routing decision")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
 
@@ -155,6 +164,10 @@ class DataCheckerNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Check and analyze data for current dataset"""
         logger.info("Data checker processing")
+        try:
+            state.messages.append("DataChecker: start")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -183,11 +196,21 @@ class DataCheckerNode:
 
             # Analyze data
             analysis_results = {}
+            basic_analysis = {}
             representative_stats: Dict[str, Dict[str, Dict[str, float]]] = {}
             for name, df in filtered_dataframes.items():
                 try:
                     logger.info(f"Analyzing dataframe {name} with shape {df.shape}")
-                    analysis_results[name] = self.repl_tool.analyze_dataframe(df, name)
+                    analysis = self.repl_tool.analyze_dataframe(df, name)
+                    analysis_results[name] = analysis
+                    # Normalize: expose summary under basic_analysis for downstream agents
+                    basic_analysis[name] = {
+                        "shape": analysis.get("shape"),
+                        "columns": analysis.get("columns"),
+                        "dtypes": analysis.get("dtypes", {}),
+                        "missing_values": analysis.get("missing_values", {}),
+                        "basic_stats": analysis.get("basic_stats", {}),
+                    }
                     representative_stats[name] = compute_representative_stats(df)
                     logger.info(f"Computed representative stats for {name}: {list(representative_stats[name].keys())}")
                 except Exception as e:
@@ -212,6 +235,17 @@ class DataCheckerNode:
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 column_info = {}
 
+            # Ensure spec texts via RAG cache for downstream agents (domain-agnostic)
+            try:
+                if not getattr(current_dataset, 'algorithm_spec_text', None):
+                    hits = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=3)
+                    current_dataset.algorithm_spec_text = "\n\n".join([r.get('content', '') for r in (hits or [])])[:3000] or None
+                if not getattr(current_dataset, 'evaluation_spec_text', None):
+                    hits = self.rag_tool.search("evaluation specification core sections", "evaluation_specs", k=3)
+                    current_dataset.evaluation_spec_text = "\n\n".join([r.get('content', '') for r in (hits or [])])[:3000] or None
+            except Exception as _ex:
+                logger.warning(f"Failed to populate spec text cache: {_ex}")
+
             # Extract column mapping from specs using LLM
             logger.info("Extracting column mapping from specs")
             try:
@@ -226,6 +260,7 @@ class DataCheckerNode:
             # Update dataset state
             current_dataset.data_summary = {
                 "analysis": analysis_results,
+                "basic_analysis": basic_analysis,
                 "plots": plot_paths,
                 "column_info": column_info,
                 "column_mapping": column_mapping_result,
@@ -241,12 +276,27 @@ class DataCheckerNode:
                     state.analysis_results = {}
                 state.analysis_results[current_dataset.id] = {
                     "analysis": analysis_results,
+                    "basic_analysis": basic_analysis,
                     "plots": plot_paths,
                     "column_info": column_info,
                     "column_mapping": column_mapping_result,
                     "representative_stats": representative_stats,
                     "evaluation_interval": interval,
                 }
+                # Debug snapshot for step-by-step trace
+                try:
+                    dataset_paths = get_report_paths(config.output_dir, f"report_{current_dataset.id}")
+                    logs_dir = dataset_paths["logs"]
+                    import json
+                    with open(logs_dir / "state_snapshot.json", 'w', encoding='utf-8') as f:
+                        json.dump({
+                            "messages": getattr(state, 'messages', []),
+                            "workflow_step": state.workflow_step,
+                            "current_dataset": current_dataset.model_dump() if hasattr(current_dataset, 'model_dump') else {},
+                            "analysis_results": state.analysis_results.get(current_dataset.id, {}),
+                        }, f, ensure_ascii=False, indent=2)
+                except Exception as ex:
+                    logger.warning(f"Failed to write state snapshot: {ex}")
                 logger.info(f"Successfully stored results for dataset {current_dataset.id}")
             except Exception as e:
                 logger.error(f"Failed to store analysis results: {e}")
@@ -254,6 +304,10 @@ class DataCheckerNode:
                 logger.error(f"Traceback: {traceback.format_exc()}")
 
             logger.info(f"Data checking completed for dataset {current_dataset.id}")
+            try:
+                state.messages.append(f"DataChecker: completed for {current_dataset.id}")
+            except Exception:
+                pass
 
         except Exception as e:
             error_msg = f"Data checking failed: {e}"
@@ -390,14 +444,22 @@ plt.tight_layout()
         # Use RAG tool to search for column information
         column_info = self._get_column_info_from_specs(dataset)
 
-        # Extract columns and thresholds using LLM with spec content
+        # Extract columns and thresholds using LLM with spec content via RAG/cache (no direct file I/O)
         spec_content = ""
-        if dataset.algorithm_spec_md:
-            with open(dataset.algorithm_spec_md, 'r', encoding='utf-8') as f:
-                spec_content += f.read()
-        if dataset.evaluation_spec_md:
-            with open(dataset.evaluation_spec_md, 'r', encoding='utf-8') as f:
-                spec_content += f.read()
+        try:
+            algo_text = getattr(dataset, 'algorithm_spec_text', None) or ""
+            eval_text = getattr(dataset, 'evaluation_spec_text', None) or ""
+            if algo_text:
+                spec_content += algo_text
+            if eval_text:
+                spec_content += ("\n" + eval_text)
+            if not spec_content:
+                algo_hits = self.rag_tool.search("algorithm specification core sections", "algorithm_specs", k=3)
+                eval_hits = self.rag_tool.search("evaluation specification core sections", "evaluation_specs", k=3)
+                parts = [r.get('content', '') for r in (algo_hits or [])] + [r.get('content', '') for r in (eval_hits or [])]
+                spec_content = "\n\n".join([p for p in parts if p])
+        except Exception:
+            spec_content = spec_content or ""
 
         # Extract columns using LLM with fallback strategies
         input_columns = []
@@ -465,18 +527,8 @@ plt.tight_layout()
             'thresholds': thresholds
         }
 
-        # Ensure we have at least some columns for plotting
-        if not column_mapping['input'] and not column_mapping['output']:
-            # Fallback: use numeric columns from CSV
-            numeric_columns = [col for col in available_columns if col in ['confidence', 'score', 'openness', 'probability', 'leye_openness', 'reye_openness']]
-            if numeric_columns:
-                column_mapping['input'] = {col: col for col in numeric_columns[:4]}  # Take up to 4 columns
-            else:
-                # Last resort: take first few numeric columns
-                import pandas as pd
-                if 'algorithm_data' in state and hasattr(state['algorithm_data'], 'select_dtypes'):
-                    numeric_cols = state['algorithm_data'].select_dtypes(include=['number']).columns.tolist()
-                    column_mapping['input'] = {col: col for col in numeric_cols[:4]}
+        # Ensure we have at least some columns for plotting: rely on LLM/RAG results only (no domain-specific fallback)
+        # If none extracted, leave mapping empty and downstream will handle/report appropriately.
 
         logger.info(f"Extracted column mapping - input: {list(column_mapping['input'].keys())}, output: {list(column_mapping['output'].keys())}, thresholds: {list(thresholds.keys())}")
 
@@ -516,61 +568,38 @@ plt.tight_layout()
         return mapping
 
     def _generate_column_variations(self, column: str) -> List[str]:
-        """Generate common variations of column names"""
-        variations = []
+        """Generate minimal, generic variations of column names (domain-agnostic)."""
         base = column.lower()
-
-        # Common prefixes/suffixes for eye tracking data
-        prefixes = ['left_', 'right_', 'leye_', 'reye_', 'face_']
-        suffixes = ['_openness', '_closed', '_confidence', '_score', '_result']
-
-        for prefix in prefixes:
-            if not base.startswith(prefix):
-                variations.append(f"{prefix}{base}")
-
-        for suffix in suffixes:
-            if not base.endswith(suffix):
-                variations.append(f"{base}{suffix}")
-
-        # Special mappings for common columns
-        special_mappings = {
-            'confidence': ['face_confidence', 'leye_confidence', 'reye_confidence'],
-            'openness': ['leye_openness', 'reye_openness'],
-            'score': ['detection_score', 'confidence_score'],
-            'result': ['detection_result', 'is_drowsy']
-        }
-
-        if base in special_mappings:
-            variations.extend(special_mappings[base])
-
-        return list(set(variations))  # Remove duplicates
+        collapsed = base.replace('_', '')
+        vars_set = {base, collapsed}
+        return list(vars_set)
 
     def _extract_columns_with_regex(self, spec_content: str, column_type: str) -> List[str]:
-        """Extract columns using regex patterns as fallback"""
+        """Extract columns using regex patterns (generic, domain-agnostic)."""
         import re
         columns = []
 
         # Common column patterns in specifications
         if column_type == 'input':
-            # Input feature patterns
+            # Input feature patterns (generic)
             patterns = [
-                r'入力[:\s]*([^、。\n]+)',  # Japanese input patterns
+                r'入力[:\s]*([^、。\n]+)',
                 r'特徴量[:\s]*([^、。\n]+)',
-                r'feature[:\s]*([^,.\n]+)',  # English patterns
+                r'feature[:\s]*([^,.\n]+)',
                 r'column[:\s]*([^,.\n]+)'
             ]
-            # Common input column names for eye-tracking
-            common_inputs = ['confidence', 'openness', 'leye', 'reye', 'face', 'score', 'probability']
+            # Generic inputs
+            common_inputs = ['confidence', 'score', 'probability', 'feature', 'signal', 'value']
         else:  # output
-            # Output/result patterns
+            # Output/result patterns (generic)
             patterns = [
-                r'出力[:\s]*([^、。\n]+)',  # Japanese output patterns
+                r'出力[:\s]*([^、。\n]+)',
                 r'結果[:\s]*([^、。\n]+)',
-                r'result[:\s]*([^,.\n]+)',  # English patterns
+                r'result[:\s]*([^,.\n]+)',
                 r'output[:\s]*([^,.\n]+)'
             ]
-            # Common output column names
-            common_outputs = ['is_drowsy', 'detection', 'result', 'prediction']
+            # Generic outputs
+            common_outputs = ['result', 'prediction', 'output', 'label', 'status']
 
         # Extract using patterns
         for pattern in patterns:
@@ -608,6 +637,10 @@ class ConsistencyCheckerNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Check consistency for current dataset"""
         logger.info("Consistency checker processing")
+        try:
+            state.messages.append("ConsistencyChecker: start")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -645,6 +678,10 @@ class ConsistencyCheckerNode:
             current_dataset.status = "consistency_checked"
 
             logger.info(f"Consistency checking completed for dataset {current_dataset.id}")
+            try:
+                state.messages.append(f"ConsistencyChecker: completed for {current_dataset.id}")
+            except Exception:
+                pass
 
         except Exception as e:
             error_msg = f"Consistency checking failed: {e}"
@@ -975,6 +1012,10 @@ class HypothesisGeneratorNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Generate hypotheses for current dataset"""
         logger.info("Hypothesis generator processing")
+        try:
+            state.messages.append("HypothesisGenerator: start")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -1000,6 +1041,10 @@ class HypothesisGeneratorNode:
             state.hypotheses[current_dataset.id] = hypotheses
 
             logger.info(f"Generated {len(hypotheses)} hypotheses for dataset {current_dataset.id}")
+            try:
+                state.messages.append(f"HypothesisGenerator: {len(hypotheses)} hypotheses for {current_dataset.id}")
+            except Exception:
+                pass
 
         except Exception as e:
             error_msg = f"Hypothesis generation failed: {e}"
@@ -1047,6 +1092,10 @@ class VerifierNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Verify hypotheses for current dataset"""
         logger.info("Verifier processing")
+        try:
+            state.messages.append("Verifier: start")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -1077,6 +1126,10 @@ class VerifierNode:
             current_dataset.status = "verified"
 
             logger.info(f"Verification completed for dataset {current_dataset.id}")
+            try:
+                state.messages.append(f"Verifier: completed for {current_dataset.id}")
+            except Exception:
+                pass
 
         except Exception as e:
             error_msg = f"Verification failed: {e}"
@@ -1156,6 +1209,10 @@ class ReporterNode:
     def process(self, state: AnalysisState) -> AnalysisState:
         """Generate report for current dataset"""
         logger.info("Reporter processing")
+        try:
+            state.messages.append("Reporter: start")
+        except Exception:
+            pass
 
         current_dataset = state.get_current_dataset()
         if not current_dataset:
@@ -1171,14 +1228,38 @@ class ReporterNode:
                 current_dataset, analysis_results, hypotheses
             )
 
-            # Update dataset state
+            # Update dataset state & write debug snapshot
             current_dataset.report_content = report_content
             current_dataset.status = "completed"
+
+            try:
+                dataset_paths = get_report_paths(config.output_dir, f"report_{current_dataset.id}")
+                logs_dir = dataset_paths["logs"]
+                contexts_dir = dataset_paths["contexts"]
+                import json
+                # Write a compact state snapshot for reporter stage
+                with open(logs_dir / "reporter_snapshot.json", 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "messages": getattr(state, 'messages', []),
+                        "workflow_step": state.workflow_step,
+                        "dataset_id": current_dataset.id,
+                        "algorithm_config": getattr(config, 'algorithm', {}).model_dump() if hasattr(getattr(config, 'algorithm', {}), 'model_dump') else {},
+                        "has_report": bool(report_content),
+                    }, f, ensure_ascii=False, indent=2)
+                # Persist analysis_results for this dataset for manual inspection
+                with open(contexts_dir / "analysis_results_snapshot.json", 'w', encoding='utf-8') as f:
+                    json.dump(analysis_results, f, ensure_ascii=False, indent=2)
+            except Exception as ex:
+                logger.warning(f"Failed to write reporter snapshots: {ex}")
 
             # Move to next dataset
             state.advance_dataset()
 
             logger.info(f"Report generated for dataset {current_dataset.id}")
+            try:
+                state.messages.append(f"Reporter: report generated for {current_dataset.id}")
+            except Exception:
+                pass
 
         except Exception as e:
             error_msg = f"Report generation failed: {e}"
